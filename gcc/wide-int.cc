@@ -1,5 +1,5 @@
 /* Operations with very long integers.
-   Copyright (C) 2012-2021 Free Software Foundation, Inc.
+   Copyright (C) 2012-2023 Free Software Foundation, Inc.
    Contributed by Kenneth Zadeck <zadeck@naturalbridge.com>
 
 This file is part of GCC.
@@ -139,7 +139,7 @@ canonize_uhwi (HOST_WIDE_INT *val, unsigned int precision)
 
 /* Copy XLEN elements from XVAL to VAL.  If NEED_CANON, canonize the
    result for an integer with precision PRECISION.  Return the length
-   of VAL (after any canonization.  */
+   of VAL (after any canonization).  */
 unsigned int
 wi::from_array (HOST_WIDE_INT *val, const HOST_WIDE_INT *xval,
 		unsigned int xlen, unsigned int precision, bool need_canon)
@@ -731,16 +731,13 @@ wi::set_bit_large (HOST_WIDE_INT *val, const HOST_WIDE_INT *xval,
     }
 }
 
-/* bswap THIS.  */
-wide_int
-wide_int_storage::bswap () const
+/* Byte swap the integer represented by XVAL and LEN into VAL.  Return
+   the number of blocks in VAL.  Both XVAL and VAL have PRECISION bits.  */
+unsigned int
+wi::bswap_large (HOST_WIDE_INT *val, const HOST_WIDE_INT *xval,
+	         unsigned int len, unsigned int precision)
 {
-  wide_int result = wide_int::create (precision);
   unsigned int i, s;
-  unsigned int len = BLOCKS_NEEDED (precision);
-  unsigned int xlen = get_len ();
-  const HOST_WIDE_INT *xval = get_val ();
-  HOST_WIDE_INT *val = result.write_val ();
 
   /* This is not a well defined operation if the precision is not a
      multiple of 8.  */
@@ -758,7 +755,7 @@ wide_int_storage::bswap () const
       unsigned int block = s / HOST_BITS_PER_WIDE_INT;
       unsigned int offset = s & (HOST_BITS_PER_WIDE_INT - 1);
 
-      byte = (safe_uhwi (xval, xlen, block) >> offset) & 0xff;
+      byte = (safe_uhwi (xval, len, block) >> offset) & 0xff;
 
       block = d / HOST_BITS_PER_WIDE_INT;
       offset = d & (HOST_BITS_PER_WIDE_INT - 1);
@@ -766,8 +763,34 @@ wide_int_storage::bswap () const
       val[block] |= byte << offset;
     }
 
-  result.set_len (canonize (val, len, precision));
-  return result;
+  return canonize (val, len, precision);
+}
+
+/* Bitreverse the integer represented by XVAL and LEN into VAL.  Return
+   the number of blocks in VAL.  Both XVAL and VAL have PRECISION bits.  */
+unsigned int
+wi::bitreverse_large (HOST_WIDE_INT *val, const HOST_WIDE_INT *xval,
+		      unsigned int len, unsigned int precision)
+{
+  unsigned int i, s;
+
+  for (i = 0; i < len; i++)
+    val[i] = 0;
+
+  for (s = 0; s < precision; s++)
+    {
+      unsigned int block = s / HOST_BITS_PER_WIDE_INT;
+      unsigned int offset = s & (HOST_BITS_PER_WIDE_INT - 1);
+      if (((safe_uhwi (xval, len, block) >> offset) & 1) != 0)
+	{
+	  unsigned int d = (precision - 1) - s;
+	  block = d / HOST_BITS_PER_WIDE_INT;
+	  offset = d & (HOST_BITS_PER_WIDE_INT - 1);
+	  val[block] |= HOST_WIDE_INT_1U << offset;
+	}
+    }
+
+  return canonize (val, len, precision);
 }
 
 /* Fill VAL with a mask where the lower WIDTH bits are ones and the bits
@@ -842,6 +865,13 @@ wi::shifted_mask (HOST_WIDE_INT *val, unsigned int start, unsigned int width,
 	val[i++] = negate ? block : ~block;
     }
 
+  if (end >= prec)
+    {
+      if (!shift)
+	val[i++] = negate ? 0 : -1;
+      return i;
+    }
+
   while (i < end / HOST_BITS_PER_WIDE_INT)
     /* 1111111 */
     val[i++] = negate ? 0 : -1;
@@ -853,7 +883,7 @@ wi::shifted_mask (HOST_WIDE_INT *val, unsigned int start, unsigned int width,
       HOST_WIDE_INT block = (HOST_WIDE_INT_1U << shift) - 1;
       val[i++] = negate ? ~block : block;
     }
-  else if (end < prec)
+  else
     val[i++] = negate ? -1 : 0;
 
   return i;
@@ -1881,9 +1911,9 @@ wi::divmod_internal (HOST_WIDE_INT *quotient, unsigned int *remainder_len,
     }
 
   wi_unpack (b_dividend, dividend.get_val (), dividend.get_len (),
-	     dividend_blocks_needed, dividend_prec, sgn);
+	     dividend_blocks_needed, dividend_prec, UNSIGNED);
   wi_unpack (b_divisor, divisor.get_val (), divisor.get_len (),
-	     divisor_blocks_needed, divisor_prec, sgn);
+	     divisor_blocks_needed, divisor_prec, UNSIGNED);
 
   m = dividend_blocks_needed;
   b_dividend[m] = 0;
@@ -2050,6 +2080,10 @@ wi::arshift_large (HOST_WIDE_INT *val, const HOST_WIDE_INT *xval,
 int
 wi::clz (const wide_int_ref &x)
 {
+  if (x.sign_mask () < 0)
+    /* The upper bit is set, so there are no leading zeros.  */
+    return 0;
+
   /* Calculate how many bits there above the highest represented block.  */
   int count = x.precision - x.len * HOST_BITS_PER_WIDE_INT;
 
@@ -2058,9 +2092,6 @@ wi::clz (const wide_int_ref &x)
     /* The upper -COUNT bits of HIGH are not part of the value.
        Clear them out.  */
     high = (high << -count) >> -count;
-  else if (x.sign_mask () < 0)
-    /* The upper bit is set, so there are no leading zeros.  */
-    return 0;
 
   /* We don't need to look below HIGH.  Either HIGH is nonzero,
      or the top bit of the block below is nonzero; clz_hwi is
@@ -2582,6 +2613,10 @@ wide_int_cc_tests ()
   run_all_wide_int_tests <widest_int> ();
   test_overflow ();
   test_round_for_mask ();
+  ASSERT_EQ (wi::mask (128, false, 128),
+	     wi::shifted_mask (0, 128, false, 128));
+  ASSERT_EQ (wi::mask (128, true, 128),
+	     wi::shifted_mask (0, 128, true, 128));
 }
 
 } // namespace selftest

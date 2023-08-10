@@ -59,8 +59,8 @@ void test_6 (size_t sz)
 
 void *test_7 (size_t sz)
 {
-  char buf[100];
-  void *p = realloc (&buf, sz); /* { dg-warning "'realloc' of '&buf' which points to memory not on the heap" } */
+  char buf[100]; /* { dg-message "region created on stack here" } */
+  void *p = realloc (&buf, sz); /* { dg-warning "'realloc' of '&buf' which points to memory on the stack" } */
   return p;  
 }
 
@@ -88,3 +88,8 @@ void test_9 (void *p)
   free (p);
   void *q = realloc (p, 1024); /* { dg-warning "double-'free' of 'p'" } */
 }
+
+void test_10 (char *s, int n)
+{
+  __builtin_realloc(s, n); /* { dg-warning "ignoring return value of '__builtin_realloc' declared with attribute 'warn_unused_result'" } */
+} /* { dg-warning "leak" } */

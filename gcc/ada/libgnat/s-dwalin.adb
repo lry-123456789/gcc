@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2009-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2009-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -31,23 +31,28 @@
 
 with Ada.Characters.Handling;
 with Ada.Containers.Generic_Array_Sort;
-with Ada.Exceptions.Traceback; use Ada.Exceptions.Traceback;
 with Ada.Unchecked_Deallocation;
 
 with Interfaces; use Interfaces;
 
-with System;                   use System;
 with System.Address_Image;
 with System.Bounded_Strings;   use System.Bounded_Strings;
 with System.IO;                use System.IO;
 with System.Mmap;              use System.Mmap;
 with System.Object_Reader;     use System.Object_Reader;
-with System.Traceback_Entries; use System.Traceback_Entries;
 with System.Storage_Elements;  use System.Storage_Elements;
 
 package body System.Dwarf_Lines is
 
-   SSU : constant := System.Storage_Unit;
+   subtype Offset is Object_Reader.Offset;
+
+   function "-" (Left, Right : Address) return uint32;
+   pragma Import (Intrinsic, "-");
+   --  Return the difference between two addresses as an unsigned offset
+
+   function Get_Load_Displacement (C : Dwarf_Context) return Storage_Offset;
+   --  Return the displacement between the load address present in the binary
+   --  and the run-time address at which it is loaded (i.e. non-zero for PIE).
 
    function String_Length (Str : Str_Access) return Natural;
    --  Return the length of the C string Str
@@ -75,20 +80,22 @@ package body System.Dwarf_Lines is
    --  Read an entry format array, as specified by 6.2.4.1
 
    procedure Read_Aranges_Entry
-     (C     : in out Dwarf_Context;
-      Start :    out Storage_Offset;
-      Len   :    out Storage_Count);
+     (C         : in out Dwarf_Context;
+      Addr_Size :        Natural;
+      Start     :    out Address;
+      Len       :    out Storage_Count);
    --  Read a single .debug_aranges pair
 
    procedure Read_Aranges_Header
      (C           : in out Dwarf_Context;
       Info_Offset :    out Offset;
+      Addr_Size   :    out Natural;
       Success     :    out Boolean);
    --  Read .debug_aranges header
 
    procedure Aranges_Lookup
      (C           : in out Dwarf_Context;
-      Addr        :        Storage_Offset;
+      Addr        :        Address;
       Info_Offset :    out Offset;
       Success     :    out Boolean);
    --  Search for Addr in .debug_aranges and return offset Info_Offset in
@@ -153,7 +160,7 @@ package body System.Dwarf_Lines is
 
    procedure Symbolic_Address
      (C           : in out Dwarf_Context;
-      Addr        :        Storage_Offset;
+      Addr        :        Address;
       Dir_Name    :    out Str_Access;
       File_Name   :    out Str_Access;
       Subprg_Name :    out String_Ptr_Len;
@@ -370,6 +377,19 @@ package body System.Dwarf_Lines is
       end loop;
    end For_Each_Row;
 
+   ---------------------------
+   -- Get_Load_Displacement --
+   ---------------------------
+
+   function Get_Load_Displacement (C : Dwarf_Context) return Storage_Offset is
+   begin
+      if C.Load_Address /= Null_Address then
+         return C.Load_Address - Address (Get_Load_Address (C.Obj.all));
+      else
+         return 0;
+      end if;
+   end Get_Load_Displacement;
+
    ---------------------
    -- Initialize_Pass --
    ---------------------
@@ -405,18 +425,19 @@ package body System.Dwarf_Lines is
    ---------------
 
    function Is_Inside (C : Dwarf_Context; Addr : Address) return Boolean is
+      Disp : constant Storage_Offset := Get_Load_Displacement (C);
+
    begin
-      return (Addr >= C.Low + C.Load_Address
-                and then Addr <= C.High + C.Load_Address);
+      return Addr >= C.Low + Disp and then Addr <= C.High + Disp;
    end Is_Inside;
 
    -----------------
    -- Low_Address --
    -----------------
 
-   function Low_Address (C : Dwarf_Context) return System.Address is
+   function Low_Address (C : Dwarf_Context) return Address is
    begin
-      return C.Load_Address + C.Low;
+      return C.Low + Get_Load_Displacement (C);
    end Low_Address;
 
    ----------
@@ -450,12 +471,12 @@ package body System.Dwarf_Lines is
 
       Success := True;
 
-      --  Get memory bounds for executable code.  Note that such code
+      --  Get address bounds for executable code. Note that such code
       --  might come from multiple sections.
 
       Get_Xcode_Bounds (C.Obj.all, Lo, Hi);
-      C.Low  := Storage_Offset (Lo);
-      C.High := Storage_Offset (Hi);
+      C.Low  := Address (Lo);
+      C.High := Address (Hi);
 
       --  Create a stream for debug sections
 
@@ -568,10 +589,10 @@ package body System.Dwarf_Lines is
          Standard_Opcode_Lengths (J) := Read (C.Lines);
       end loop;
 
-      --  The directories table follows. Up to DWARF 4, this is a list of null
+      --  The Directories table follows. Up to DWARF 4, this is a list of null
       --  terminated strings terminated by a null byte. In DWARF 5, this is a
-      --  sequence of Directories_Count entries encoded as described by the
-      --  Directory_Entry_Format field. We store its offset for later decoding.
+      --  sequence of Directories_Count entries which are encoded as described
+      --  by the Directory_Entry_Format field. We store its offset for later.
 
       if Header.Version <= 4 then
          Tell (C.Lines, Header.Directories);
@@ -603,12 +624,12 @@ package body System.Dwarf_Lines is
          end loop;
       end if;
 
-      --  The file_names table is next. Up to DWARF 4, this is a list of record
+      --  The File_Names table is next. Up to DWARF 4, this is a list of record
       --  containing a null terminated string for the file name, an unsigned
       --  LEB128 directory index in the Directories table, an unsigned LEB128
       --  modification time, and an unsigned LEB128 for the file length; the
       --  table is terminated by a null byte. In DWARF 5, this is a sequence
-      --  of File_Names_Count entries encoded as described by the
+      --  of File_Names_Count entries which are encoded as described by the
       --  File_Name_Entry_Format field. We store its offset for later decoding.
 
       if Header.Version <= 4 then
@@ -941,8 +962,10 @@ package body System.Dwarf_Lines is
 
                      when DW_FORM_line_strp =>
                         Read_Section_Offset (C.Lines, Off, C.Header.Is64);
-                        Seek (C.Line_Str, Off);
-                        Read_C_String (C.Line_Str, Buf);
+                        if J = File then
+                           Seek (C.Line_Str, Off);
+                           Read_C_String (C.Line_Str, Buf);
+                        end if;
 
                      when others =>
                         raise Dwarf_Error with "DWARF form not implemented";
@@ -1027,7 +1050,7 @@ package body System.Dwarf_Lines is
          case C_Type is
             when DW_LNCT_path .. DW_LNCT_MD5 =>
                if N not in A'Range then
-                  raise Dwarf_Error with "DWARF duplicate content type";
+                  raise Dwarf_Error with "duplicate DWARF content type";
                end if;
 
                A (N) := (C_Type, Form);
@@ -1048,24 +1071,25 @@ package body System.Dwarf_Lines is
 
    procedure Aranges_Lookup
      (C           : in out Dwarf_Context;
-      Addr        :        Storage_Offset;
+      Addr        :        Address;
       Info_Offset :    out Offset;
       Success     :    out Boolean)
    is
+      Addr_Size : Natural;
    begin
       Info_Offset := 0;
       Seek (C.Aranges, 0);
 
       while Tell (C.Aranges) < Length (C.Aranges) loop
-         Read_Aranges_Header (C, Info_Offset, Success);
+         Read_Aranges_Header (C, Info_Offset, Addr_Size, Success);
          exit when not Success;
 
          loop
             declare
-               Start : Storage_Offset;
+               Start : Address;
                Len   : Storage_Count;
             begin
-               Read_Aranges_Entry (C, Start, Len);
+               Read_Aranges_Entry (C, Addr_Size, Start, Len);
                exit when Start = 0 and Len = 0;
                if Addr >= Start
                  and then Addr < Start + Len
@@ -1098,8 +1122,6 @@ package body System.Dwarf_Lines is
       case Form is
          when DW_FORM_addr =>
             Skip := Offset (Ptr_Sz);
-         when DW_FORM_addrx =>
-            Skip := Offset (uint32'(Read_LEB128 (S)));
          when DW_FORM_block1 =>
             Skip := Offset (uint8'(Read (S)));
          when DW_FORM_block2 =>
@@ -1145,11 +1167,12 @@ package body System.Dwarf_Lines is
             begin
                return;
             end;
-         when DW_FORM_udata
-            | DW_FORM_ref_udata
+         when DW_FORM_addrx
             | DW_FORM_loclistx
+            | DW_FORM_ref_udata
             | DW_FORM_rnglistx
             | DW_FORM_strx
+            | DW_FORM_udata
            =>
             declare
                Val : constant uint32 := Read_LEB128 (S);
@@ -1157,7 +1180,7 @@ package body System.Dwarf_Lines is
             begin
                return;
             end;
-         when DW_FORM_flag_present =>
+         when DW_FORM_flag_present | DW_FORM_implicit_const =>
             return;
          when DW_FORM_ref_addr
             | DW_FORM_sec_offset
@@ -1171,10 +1194,10 @@ package body System.Dwarf_Lines is
                null;
             end loop;
             return;
-         when DW_FORM_implicit_const | DW_FORM_indirect =>
-            raise Constraint_Error;
+         when DW_FORM_indirect =>
+            raise Dwarf_Error with "DW_FORM_indirect not implemented";
          when others =>
-            raise Constraint_Error;
+            raise Dwarf_Error with "DWARF form not implemented";
       end case;
 
       Seek (S, Tell (S) + Skip);
@@ -1264,9 +1287,6 @@ package body System.Dwarf_Lines is
          Unit_Type := Read (C.Info);
 
          Addr_Sz := Read (C.Info);
-         if Addr_Sz /= (Address'Size / SSU) then
-            return;
-         end if;
 
          Read_Section_Offset (C.Info, Abbrev_Offset, Is64);
 
@@ -1274,9 +1294,6 @@ package body System.Dwarf_Lines is
          Read_Section_Offset (C.Info, Abbrev_Offset, Is64);
 
          Addr_Sz := Read (C.Info);
-         if Addr_Sz /= (Address'Size / SSU) then
-            return;
-         end if;
 
       else
          return;
@@ -1338,6 +1355,7 @@ package body System.Dwarf_Lines is
    procedure Read_Aranges_Header
      (C           : in out Dwarf_Context;
       Info_Offset :    out Offset;
+      Addr_Size   :    out Natural;
       Success     :    out Boolean)
    is
       Unit_Length : Offset;
@@ -1348,6 +1366,7 @@ package body System.Dwarf_Lines is
    begin
       Success     := False;
       Info_Offset := 0;
+      Addr_Size   := 0;
 
       Read_Initial_Length (C.Aranges, Unit_Length, Is64);
 
@@ -1360,10 +1379,7 @@ package body System.Dwarf_Lines is
 
       --  Read address_size (ubyte)
 
-      Sz := Read (C.Aranges);
-      if Sz /= (Address'Size / SSU) then
-         return;
-      end if;
+      Addr_Size := Natural (uint8'(Read (C.Aranges)));
 
       --  Read segment_size (ubyte)
 
@@ -1376,7 +1392,7 @@ package body System.Dwarf_Lines is
 
       declare
          Cur_Off : constant Offset := Tell (C.Aranges);
-         Align   : constant Offset := 2 * Address'Size / SSU;
+         Align   : constant Offset := 2 * Offset (Addr_Size);
          Space   : constant Offset := Cur_Off mod Align;
       begin
          if Space /= 0 then
@@ -1392,30 +1408,31 @@ package body System.Dwarf_Lines is
    ------------------------
 
    procedure Read_Aranges_Entry
-     (C     : in out Dwarf_Context;
-      Start :    out Storage_Offset;
-      Len   :    out Storage_Count)
+     (C         : in out Dwarf_Context;
+      Addr_Size :        Natural;
+      Start     :    out Address;
+      Len       :    out Storage_Count)
    is
    begin
       --  Read table
 
-      if Address'Size = 32 then
+      if Addr_Size = 4 then
          declare
             S, L : uint32;
          begin
             S     := Read (C.Aranges);
             L     := Read (C.Aranges);
-            Start := Storage_Offset (S);
+            Start := Address (S);
             Len   := Storage_Count (L);
          end;
 
-      elsif Address'Size = 64 then
+      elsif Addr_Size = 8 then
          declare
             S, L : uint64;
          begin
             S     := Read (C.Aranges);
             L     := Read (C.Aranges);
-            Start := Storage_Offset (S);
+            Start := Address (S);
             Len   := Storage_Count (L);
          end;
 
@@ -1504,17 +1521,19 @@ package body System.Dwarf_Lines is
       declare
          Info_Offset : Offset;
          Line_Offset : Offset;
+         Addr_Size   : Natural;
          Success     : Boolean;
-         Ar_Start    : Storage_Offset;
+         Ar_Start    : Address;
          Ar_Len      : Storage_Count;
          Start, Len  : uint32;
          First, Last : Natural;
          Mid         : Natural;
+
       begin
          Seek (C.Aranges, 0);
 
          while Tell (C.Aranges) < Length (C.Aranges) loop
-            Read_Aranges_Header (C, Info_Offset, Success);
+            Read_Aranges_Header (C, Info_Offset, Addr_Size, Success);
             exit when not Success;
 
             Debug_Info_Lookup (C, Info_Offset, Line_Offset, Success);
@@ -1523,11 +1542,11 @@ package body System.Dwarf_Lines is
             --  Read table
 
             loop
-               Read_Aranges_Entry (C, Ar_Start, Ar_Len);
-               exit when Ar_Start = 0 and Ar_Len = 0;
+               Read_Aranges_Entry (C, Addr_Size, Ar_Start, Ar_Len);
+               exit when Ar_Start = Null_Address and Ar_Len = 0;
 
                Len   := uint32 (Ar_Len);
-               Start := uint32 (Ar_Start - C.Low);
+               Start := uint32'(Ar_Start - C.Low);
 
                --  Search START in the array
 
@@ -1580,7 +1599,7 @@ package body System.Dwarf_Lines is
 
    procedure Symbolic_Address
      (C           : in out Dwarf_Context;
-      Addr        :        Storage_Offset;
+      Addr        :        Address;
       Dir_Name    :    out Str_Access;
       File_Name   :    out Str_Access;
       Subprg_Name :    out String_Ptr_Len;
@@ -1658,8 +1677,10 @@ package body System.Dwarf_Lines is
 
                         when DW_FORM_line_strp =>
                            Read_Section_Offset (C.Lines, Off, C.Header.Is64);
-                           Seek (C.Line_Str, Off);
-                           File_Name := Read_C_String (C.Line_Str);
+                           if J = Match.File then
+                              Seek (C.Line_Str, Off);
+                              File_Name := Read_C_String (C.Line_Str);
+                           end if;
 
                         when others =>
                            raise Dwarf_Error with "DWARF form not implemented";
@@ -1678,7 +1699,8 @@ package body System.Dwarf_Lines is
                            Dir_Idx := Read_LEB128 (C.Lines);
 
                         when others =>
-                           raise Dwarf_Error with "invalid DWARF";
+                           raise Dwarf_Error with
+                             "invalid DWARF form for DW_LNCT_directory_index";
                      end case;
 
                   else
@@ -1702,8 +1724,10 @@ package body System.Dwarf_Lines is
 
                         when DW_FORM_line_strp =>
                            Read_Section_Offset (C.Lines, Off, C.Header.Is64);
-                           Seek (C.Line_Str, Off);
-                           Dir_Name := Read_C_String (C.Line_Str);
+                           if J = Dir_Idx then
+                              Seek (C.Line_Str, Off);
+                              Dir_Name := Read_C_String (C.Line_Str);
+                           end if;
 
                         when others =>
                            raise Dwarf_Error with "DWARF form not implemented";
@@ -1742,7 +1766,8 @@ package body System.Dwarf_Lines is
 
       if C.Cache /= null then
          declare
-            Addr_Off         : constant uint32 := uint32 (Addr - C.Low);
+            Off : constant uint32 := uint32'(Addr - C.Low);
+
             First, Last, Mid : Natural;
          begin
             First := C.Cache'First;
@@ -1751,17 +1776,17 @@ package body System.Dwarf_Lines is
 
             while First <= Last loop
                Mid := First + (Last - First) / 2;
-               if Addr_Off < C.Cache (Mid).First then
+               if Off < C.Cache (Mid).First then
                   Last := Mid - 1;
-               elsif Addr_Off >= C.Cache (Mid).First + C.Cache (Mid).Size then
+               elsif Off >= C.Cache (Mid).First + C.Cache (Mid).Size then
                   First := Mid + 1;
                else
                   exit;
                end if;
             end loop;
 
-            if Addr_Off >= C.Cache (Mid).First
-              and then Addr_Off < C.Cache (Mid).First + C.Cache (Mid).Size
+            if Off >= C.Cache (Mid).First
+              and then Off < C.Cache (Mid).First + C.Cache (Mid).Size
             then
                Line_Offset := Offset (C.Cache (Mid).Line);
                S := Read_Symbol (C.Obj.all, Offset (C.Cache (Mid).Sym));
@@ -1864,7 +1889,7 @@ package body System.Dwarf_Lines is
 
    procedure Symbolic_Traceback
      (Cin          :        Dwarf_Context;
-      Traceback    :        AET.Tracebacks_Array;
+      Traceback    :        STE.Tracebacks_Array;
       Suppress_Hex :        Boolean;
       Symbol_Found :    out Boolean;
       Res          : in out System.Bounded_Strings.Bounded_String)
@@ -1873,7 +1898,6 @@ package body System.Dwarf_Lines is
       C : Dwarf_Context := Cin;
 
       Addr_In_Traceback : Address;
-      Offset_To_Lookup  : Storage_Offset;
 
       Dir_Name    : Str_Access;
       File_Name   : Str_Access;
@@ -1893,13 +1917,11 @@ package body System.Dwarf_Lines is
          --  If the buffer is full, no need to do any useless work
          exit when Is_Full (Res);
 
-         Addr_In_Traceback := PC_For (Traceback (J));
-
-         Offset_To_Lookup := Addr_In_Traceback - C.Load_Address;
+         Addr_In_Traceback := STE.PC_For (Traceback (J));
 
          Symbolic_Address
            (C,
-            Offset_To_Lookup,
+            Addr_In_Traceback - Get_Load_Displacement (C),
             Dir_Name,
             File_Name,
             Subprg_Name,

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2020-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2020-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -57,7 +57,6 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Debug_Info_Off, Flag),
         Sm (Default_Expressions_Processed, Flag),
         Sm (Delay_Cleanups, Flag),
-        Sm (Delay_Subprogram_Descriptors, Flag),
         Sm (Depends_On_Private, Flag),
         Sm (Disable_Controlled, Flag, Base_Type_Only),
         Sm (Discard_Names, Flag),
@@ -126,6 +125,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Is_Character_Type, Flag),
         Sm (Is_Checked_Ghost_Entity, Flag),
         Sm (Is_Child_Unit, Flag),
+        Sm (Is_Class_Wide_Wrapper, Flag),
         Sm (Is_Class_Wide_Equivalent_Type, Flag),
         Sm (Is_Compilation_Unit, Flag),
         Sm (Is_Concurrent_Record_Type, Flag),
@@ -139,6 +139,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Is_Discrim_SO_Function, Flag),
         Sm (Is_Discriminant_Check_Function, Flag),
         Sm (Is_Dispatch_Table_Entity, Flag),
+        Sm (Is_Dispatch_Table_Wrapper, Flag),
         Sm (Is_Dispatching_Operation, Flag),
         Sm (Is_Eliminated, Flag),
         Sm (Is_Entry_Formal, Flag),
@@ -175,6 +176,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Is_Package_Body_Entity, Flag),
         Sm (Is_Packed, Flag, Impl_Base_Type_Only),
         Sm (Is_Packed_Array_Impl_Type, Flag),
+        Sm (Is_Not_Self_Hidden, Flag),
         Sm (Is_Potentially_Use_Visible, Flag),
         Sm (Is_Preelaborated, Flag),
         Sm (Is_Private_Descendant, Flag),
@@ -215,7 +217,6 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (No_Return, Flag),
         Sm (Overlays_Constant, Flag),
         Sm (Prev_Entity, Node_Id),
-        Sm (Reachable, Flag),
         Sm (Referenced, Flag),
         Sm (Referenced_As_LHS, Flag),
         Sm (Referenced_As_Out_Parameter, Flag),
@@ -248,9 +249,11 @@ begin -- Gen_IL.Gen.Gen_Entities
        --  resolution on calls).
        (Sm (Alignment, Unat),
         Sm (Contract, Node_Id),
+        Sm (First_Entity, Node_Id),
+        Sm (Last_Entity, Node_Id),
         Sm (Is_Elaboration_Warnings_OK_Id, Flag),
         Sm (Original_Record_Component, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
+        Sm (Scope_Depth_Value, Unat),
         Sm (SPARK_Pragma, Node_Id),
         Sm (SPARK_Pragma_Inherited, Flag),
         Sm (Current_Value, Node_Id), -- setter only
@@ -283,14 +286,12 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Esize, Uint),
         Sm (RM_Size, Uint),
         Sm (Extra_Formal, Node_Id),
-        Sm (First_Entity, Node_Id),
         Sm (Generic_Homonym, Node_Id),
         Sm (Generic_Renamings, Elist_Id),
         Sm (Handler_Records, List_Id),
         Sm (Has_Static_Discriminants, Flag),
         Sm (Inner_Instances, Elist_Id),
         Sm (Interface_Name, Node_Id),
-        Sm (Last_Entity, Node_Id),
         Sm (Next_Inlined_Subprogram, Node_Id),
         Sm (Renamed_Or_Alias, Node_Id), -- See Einfo.Utils
         Sm (Return_Applies_To, Node_Id),
@@ -316,7 +317,6 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Interface_Name, Node_Id),
         Sm (Normalized_First_Bit, Uint),
         Sm (Normalized_Position, Uint),
-        Sm (Normalized_Position_Max, Uint),
         Sm (Original_Record_Component, Node_Id)));
 
    Cc (E_Component, Record_Field_Kind,
@@ -467,6 +467,8 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Predicates_Ignored, Flag),
         Sm (Esize, Uint),
         Sm (Finalize_Storage_Only, Flag, Base_Type_Only),
+        Sm (First_Entity, Node_Id),
+        Sm (Last_Entity, Node_Id),
         Sm (Full_View, Node_Id),
         Sm (Has_Completion_In_Body, Flag),
         Sm (Has_Constrained_Partial_View, Flag, Base_Type_Only),
@@ -474,6 +476,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Has_Dispatch_Table, Flag,
             Pre => "Is_Tagged_Type (N)"),
         Sm (Has_Dynamic_Predicate_Aspect, Flag),
+        Sm (Has_Ghost_Predicate_Aspect, Flag),
         Sm (Has_Inheritable_Invariants, Flag, Base_Type_Only),
         Sm (Has_Inherited_DIC, Flag, Base_Type_Only),
         Sm (Has_Inherited_Invariants, Flag, Base_Type_Only),
@@ -525,7 +528,8 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Subprograms_For_Type, Elist_Id),
         Sm (Suppress_Initialization, Flag),
         Sm (Universal_Aliasing, Flag, Impl_Base_Type_Only),
-        Sm (Renamed_Or_Alias, Node_Id)));
+        Sm (Renamed_Or_Alias, Node_Id),
+        Sm (Stored_Constraint, Elist_Id)));
 
    Ab (Elementary_Kind, Type_Kind);
 
@@ -550,8 +554,7 @@ begin -- Gen_IL.Gen.Gen_Entities
 
    Cc (E_Enumeration_Type, Enumeration_Kind,
        --  Enumeration types, created by an enumeration type declaration
-       (Sm (Enum_Pos_To_Rep, Node_Id),
-        Sm (First_Entity, Node_Id)));
+       (Sm (Enum_Pos_To_Rep, Node_Id)));
 
    Cc (E_Enumeration_Subtype, Enumeration_Kind);
        --  Enumeration subtypes, created by an explicit or implicit subtype
@@ -560,8 +563,7 @@ begin -- Gen_IL.Gen.Gen_Entities
    Ab (Integer_Kind, Discrete_Kind,
        (Sm (Has_Shift_Operator, Flag, Base_Type_Only)));
 
-   Ab (Signed_Integer_Kind, Integer_Kind,
-       (Sm (First_Entity, Node_Id)));
+   Ab (Signed_Integer_Kind, Integer_Kind);
 
    Cc (E_Signed_Integer_Type, Signed_Integer_Kind);
        --  Signed integer type, used for the anonymous base type of the
@@ -606,7 +608,7 @@ begin -- Gen_IL.Gen.Gen_Entities
        --  this is the first named subtype).
 
    Ab (Decimal_Fixed_Point_Kind, Fixed_Point_Kind,
-       (Sm (Digits_Value, Uint),
+       (Sm (Digits_Value, Upos),
         Sm (Has_Machine_Radix_Clause, Flag),
         Sm (Machine_Radix_10, Flag),
         Sm (Scale_Value, Uint)));
@@ -622,7 +624,7 @@ begin -- Gen_IL.Gen.Gen_Entities
        --  first named subtype).
 
    Ab (Float_Kind, Real_Kind,
-       (Sm (Digits_Value, Uint)));
+       (Sm (Digits_Value, Upos)));
 
    Cc (E_Floating_Point_Type, Float_Kind);
        --  Floating point type, used for the anonymous base type of the
@@ -651,10 +653,7 @@ begin -- Gen_IL.Gen.Gen_Entities
 
    Cc (E_Access_Type, Access_Kind);
        --  An access type created by an access type declaration with no all
-       --  keyword present. Note that the predefined type Any_Access, which
-       --  has E_Access_Type Ekind, is used to label NULL in the upwards pass
-       --  of type analysis, to be replaced by the true access type in the
-       --  downwards resolution pass.
+       --  keyword present.
 
    Cc (E_Access_Subtype, Access_Kind);
        --  An access subtype created by a subtype declaration for any access
@@ -672,10 +671,9 @@ begin -- Gen_IL.Gen.Gen_Entities
        --  context does not provide one, the backend will see Allocator_Type
        --  itself (which will already have been frozen).
 
-   Cc (E_General_Access_Type, Access_Kind,
+   Cc (E_General_Access_Type, Access_Kind);
        --  An access type created by an access type declaration with the all
        --  keyword present.
-       (Sm (First_Entity, Node_Id)));
 
    Ab (Access_Subprogram_Kind, Access_Kind);
 
@@ -731,14 +729,12 @@ begin -- Gen_IL.Gen.Gen_Entities
    Cc (E_Array_Type, Array_Kind,
        --  An array type created by an array type declaration. Includes all
        --  cases of arrays, except for string types.
-       (Sm (First_Entity, Node_Id),
-        Sm (Static_Real_Or_String_Predicate, Node_Id)));
+       (Sm (Static_Real_Or_String_Predicate, Node_Id)));
 
    Cc (E_Array_Subtype, Array_Kind,
        --  An array subtype, created by an explicit array subtype declaration,
        --  or the use of an anonymous array subtype.
        (Sm (Predicated_Parent, Node_Id),
-        Sm (First_Entity, Node_Id),
         Sm (Static_Real_Or_String_Predicate, Node_Id)));
 
    Cc (E_String_Literal_Subtype, Array_Kind,
@@ -750,16 +746,13 @@ begin -- Gen_IL.Gen.Gen_Entities
    Ab (Class_Wide_Kind, Aggregate_Kind,
        (Sm (C_Pass_By_Copy, Flag, Impl_Base_Type_Only),
         Sm (Equivalent_Type, Node_Id),
-        Sm (First_Entity, Node_Id),
         Sm (Has_Complex_Representation, Flag, Impl_Base_Type_Only),
         Sm (Has_Record_Rep_Clause, Flag, Impl_Base_Type_Only),
         Sm (Interfaces, Elist_Id),
-        Sm (Last_Entity, Node_Id),
         Sm (No_Reordering, Flag, Impl_Base_Type_Only),
         Sm (Non_Limited_View, Node_Id),
         Sm (Parent_Subtype, Node_Id, Base_Type_Only),
-        Sm (Reverse_Bit_Order, Flag, Base_Type_Only),
-        Sm (Stored_Constraint, Elist_Id)));
+        Sm (Reverse_Bit_Order, Flag, Base_Type_Only)));
 
    Cc (E_Class_Wide_Type, Class_Wide_Kind,
        --  A class wide type, created by any tagged type declaration (i.e. if
@@ -781,15 +774,12 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Corresponding_Concurrent_Type, Node_Id),
         Sm (Corresponding_Remote_Type, Node_Id),
         Sm (Dispatch_Table_Wrappers, Elist_Id, Impl_Base_Type_Only),
-        Sm (First_Entity, Node_Id),
         Sm (Has_Complex_Representation, Flag, Impl_Base_Type_Only),
         Sm (Has_Record_Rep_Clause, Flag, Impl_Base_Type_Only),
         Sm (Interfaces, Elist_Id),
-        Sm (Last_Entity, Node_Id),
         Sm (No_Reordering, Flag, Impl_Base_Type_Only),
         Sm (Parent_Subtype, Node_Id, Base_Type_Only),
         Sm (Reverse_Bit_Order, Flag, Base_Type_Only),
-        Sm (Stored_Constraint, Elist_Id),
         Sm (Underlying_Record_View, Node_Id)));
 
    Cc (E_Record_Subtype, Aggregate_Kind,
@@ -801,22 +791,16 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Corresponding_Remote_Type, Node_Id),
         Sm (Predicated_Parent, Node_Id),
         Sm (Dispatch_Table_Wrappers, Elist_Id, Impl_Base_Type_Only),
-        Sm (First_Entity, Node_Id),
         Sm (Has_Complex_Representation, Flag, Impl_Base_Type_Only),
         Sm (Has_Record_Rep_Clause, Flag, Impl_Base_Type_Only),
         Sm (Interfaces, Elist_Id),
-        Sm (Last_Entity, Node_Id),
         Sm (No_Reordering, Flag, Impl_Base_Type_Only),
         Sm (Parent_Subtype, Node_Id, Base_Type_Only),
         Sm (Reverse_Bit_Order, Flag, Base_Type_Only),
-        Sm (Stored_Constraint, Elist_Id),
         Sm (Underlying_Record_View, Node_Id)));
 
    Ab (Incomplete_Or_Private_Kind, Composite_Kind,
-       (Sm (First_Entity, Node_Id),
-        Sm (Last_Entity, Node_Id),
-        Sm (Private_Dependents, Elist_Id),
-        Sm (Stored_Constraint, Elist_Id)));
+       (Sm (Private_Dependents, Elist_Id)));
 
    Ab (Private_Kind, Incomplete_Or_Private_Kind,
        (Sm (Underlying_Full_View, Node_Id)));
@@ -865,23 +849,23 @@ begin -- Gen_IL.Gen.Gen_Entities
        --  A private type, created by a private type declaration that has
        --  neither the keyword limited nor the keyword tagged.
        (Sm (Scalar_Range, Node_Id),
-        Sm (Scope_Depth_Value, Uint)));
+        Sm (Scope_Depth_Value, Unat)));
 
    Cc (E_Private_Subtype, Private_Kind,
        --  A subtype of a private type, created by a subtype declaration used
        --  to declare a subtype of a private type.
-       (Sm (Scope_Depth_Value, Uint)));
+       (Sm (Scope_Depth_Value, Unat)));
 
    Cc (E_Limited_Private_Type, Private_Kind,
        --  A limited private type, created by a private type declaration that
        --  has the keyword limited, but not the keyword tagged.
        (Sm (Scalar_Range, Node_Id),
-        Sm (Scope_Depth_Value, Uint)));
+        Sm (Scope_Depth_Value, Unat)));
 
    Cc (E_Limited_Private_Subtype, Private_Kind,
        --  A subtype of a limited private type, created by a subtype declaration
        --  used to declare a subtype of a limited private type.
-       (Sm (Scope_Depth_Value, Uint)));
+       (Sm (Scope_Depth_Value, Unat)));
 
    Ab (Incomplete_Kind, Incomplete_Or_Private_Kind,
        (Sm (Non_Limited_View, Node_Id)));
@@ -896,11 +880,8 @@ begin -- Gen_IL.Gen.Gen_Entities
 
    Ab (Concurrent_Kind, Composite_Kind,
        (Sm (Corresponding_Record_Type, Node_Id),
-        Sm (First_Entity, Node_Id),
         Sm (First_Private_Entity, Node_Id),
-        Sm (Last_Entity, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
-        Sm (Stored_Constraint, Elist_Id)));
+        Sm (Scope_Depth_Value, Unat)));
 
    Ab (Task_Kind, Concurrent_Kind,
        (Sm (Has_Storage_Size_Clause, Flag, Impl_Base_Type_Only),
@@ -954,8 +935,6 @@ begin -- Gen_IL.Gen.Gen_Entities
        (Sm (Access_Subprogram_Wrapper, Node_Id),
         Sm (Extra_Accessibility_Of_Result, Node_Id),
         Sm (Extra_Formals, Node_Id),
-        Sm (First_Entity, Node_Id),
-        Sm (Last_Entity, Node_Id),
         Sm (Needs_No_Actuals, Flag)));
 
    Ab (Overloadable_Kind, Entity_Kind,
@@ -978,8 +957,11 @@ begin -- Gen_IL.Gen.Gen_Entities
 
    Ab (Subprogram_Kind, Overloadable_Kind,
        (Sm (Body_Needed_For_SAL, Flag),
-        Sm (Class_Wide_Clone, Node_Id),
+        Sm (Class_Postconditions, Node_Id),
+        Sm (Class_Preconditions, Node_Id),
+        Sm (Class_Preconditions_Subprogram, Node_Id),
         Sm (Contract, Node_Id),
+        Sm (Dynamic_Call_Helper, Node_Id),
         Sm (Elaboration_Entity, Node_Id),
         Sm (Elaboration_Entity_Required, Flag),
         Sm (First_Entity, Node_Id),
@@ -987,8 +969,11 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Has_Nested_Subprogram, Flag),
         Sm (Has_Out_Or_In_Out_Parameter, Flag),
         Sm (Has_Recursive_Call, Flag),
+        Sm (Ignored_Class_Postconditions, Node_Id),
+        Sm (Ignored_Class_Preconditions, Node_Id),
         Sm (Ignore_SPARK_Mode_Pragmas, Flag),
         Sm (Import_Pragma, Node_Id),
+        Sm (Indirect_Call_Wrapper, Node_Id),
         Sm (Interface_Alias, Node_Id),
         Sm (Interface_Name, Node_Id),
         Sm (Is_Elaboration_Checks_OK_Id, Flag),
@@ -998,10 +983,11 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Linker_Section_Pragma, Node_Id),
         Sm (Overridden_Operation, Node_Id),
         Sm (Protected_Body_Subprogram, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
+        Sm (Scope_Depth_Value, Unat),
+        Sm (Static_Call_Helper, Node_Id),
         Sm (SPARK_Pragma, Node_Id),
         Sm (SPARK_Pragma_Inherited, Flag),
-        Sm (Subps_Index, Uint)));
+        Sm (Subps_Index, Unat)));
 
    Cc (E_Function, Subprogram_Kind,
        --  A function, created by a function declaration or a function body
@@ -1027,7 +1013,6 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Is_Invariant_Procedure, Flag),
         Sm (Is_Partial_Invariant_Procedure, Flag),
         Sm (Is_Predicate_Function, Flag),
-        Sm (Is_Predicate_Function_M, Flag),
         Sm (Is_Primitive_Wrapper, Flag),
         Sm (Is_Private_Primitive, Flag),
         Sm (LSP_Subprogram, Node_Id),
@@ -1035,6 +1020,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Next_Inlined_Subprogram, Node_Id),
         Sm (Original_Protected_Subprogram, Node_Id),
         Sm (Postconditions_Proc, Node_Id),
+        Sm (Predicate_Expression, Node_Id),
         Sm (Protected_Subprogram, Node_Id),
         Sm (Protection_Object, Node_Id),
         Sm (Related_Expression, Node_Id),
@@ -1042,7 +1028,8 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Thunk_Entity, Node_Id,
             Pre => "Is_Thunk (N)"),
         Sm (Wrapped_Entity, Node_Id,
-            Pre => "Is_Primitive_Wrapper (N)")));
+            Pre => "Is_Primitive_Wrapper (N)"),
+        Sm (Wrapped_Statements, Node_Id)));
 
    Cc (E_Operator, Subprogram_Kind,
        --  A predefined operator, appearing in Standard, or an implicitly
@@ -1076,7 +1063,6 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Is_Null_Init_Proc, Flag),
         Sm (Is_Partial_Invariant_Procedure, Flag),
         Sm (Is_Predicate_Function, Flag),
-        Sm (Is_Predicate_Function_M, Flag),
         Sm (Is_Primitive_Wrapper, Flag),
         Sm (Is_Private_Primitive, Flag),
         Sm (Is_Valued_Procedure, Flag),
@@ -1092,7 +1078,8 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Thunk_Entity, Node_Id,
             Pre => "Is_Thunk (N)"),
         Sm (Wrapped_Entity, Node_Id,
-            Pre => "Is_Primitive_Wrapper (N)")));
+            Pre => "Is_Primitive_Wrapper (N)"),
+        Sm (Wrapped_Statements, Node_Id)));
 
    Cc (E_Abstract_State, Overloadable_Kind,
        --  A state abstraction. Used to designate entities introduced by aspect
@@ -1129,9 +1116,10 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Postconditions_Proc, Node_Id),
         Sm (Protected_Body_Subprogram, Node_Id),
         Sm (Protection_Object, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
+        Sm (Scope_Depth_Value, Unat),
         Sm (SPARK_Pragma, Node_Id),
-        Sm (SPARK_Pragma_Inherited, Flag)));
+        Sm (SPARK_Pragma_Inherited, Flag),
+        Sm (Wrapped_Statements, Node_Id)));
 
    Cc (E_Entry_Family, Entity_Kind,
        --  An entry family, created by an entry family declaration in a
@@ -1156,9 +1144,10 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Protected_Body_Subprogram, Node_Id),
         Sm (Protection_Object, Node_Id),
         Sm (Renamed_Or_Alias, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
+        Sm (Scope_Depth_Value, Unat),
         Sm (SPARK_Pragma, Node_Id),
-        Sm (SPARK_Pragma_Inherited, Flag)));
+        Sm (SPARK_Pragma_Inherited, Flag),
+        Sm (Wrapped_Statements, Node_Id)));
 
    Cc (E_Block, Entity_Kind,
        --  A block identifier, created by an explicit or implicit label on
@@ -1170,7 +1159,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Last_Entity, Node_Id),
         Sm (Renamed_Or_Alias, Node_Id),
         Sm (Return_Applies_To, Node_Id),
-        Sm (Scope_Depth_Value, Uint)));
+        Sm (Scope_Depth_Value, Unat)));
 
    Cc (E_Entry_Index_Parameter, Entity_Kind,
        --  An entry index parameter created by an entry index specification
@@ -1201,7 +1190,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Is_Elaboration_Warnings_OK_Id, Flag),
         Sm (Last_Entity, Node_Id),
         Sm (Renamed_Or_Alias, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
+        Sm (Scope_Depth_Value, Unat),
         Sm (SPARK_Pragma, Node_Id),
         Sm (SPARK_Pragma_Inherited, Flag)));
 
@@ -1236,6 +1225,8 @@ begin -- Gen_IL.Gen.Gen_Entities
        --  implicit label declaration, not the occurrence of the label itself,
        --  which is simply a direct name referring to the label.
        (Sm (Enclosing_Scope, Node_Id),
+        Sm (Entry_Cancel_Parameter, Node_Id),
+        Sm (Reachable, Flag),
         Sm (Renamed_Or_Alias, Node_Id)));
 
    Cc (E_Loop, Entity_Kind,
@@ -1246,7 +1237,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Has_Loop_Entry_Attributes, Flag),
         Sm (Last_Entity, Node_Id),
         Sm (Renamed_Or_Alias, Node_Id),
-        Sm (Scope_Depth_Value, Uint)));
+        Sm (Scope_Depth_Value, Unat)));
 
    Cc (E_Return_Statement, Entity_Kind,
        --  A dummy entity created for each return statement. Used to hold
@@ -1258,7 +1249,7 @@ begin -- Gen_IL.Gen.Gen_Entities
        (Sm (First_Entity, Node_Id),
         Sm (Last_Entity, Node_Id),
         Sm (Return_Applies_To, Node_Id),
-        Sm (Scope_Depth_Value, Uint)));
+        Sm (Scope_Depth_Value, Unat)));
 
    Cc (E_Package, Entity_Kind,
        --  A package, created by a package declaration
@@ -1295,7 +1286,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Related_Instance, Node_Id),
         Sm (Renamed_In_Spec, Flag),
         Sm (Renamed_Or_Alias, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
+        Sm (Scope_Depth_Value, Unat),
         Sm (SPARK_Aux_Pragma, Node_Id),
         Sm (SPARK_Aux_Pragma_Inherited, Flag),
         Sm (SPARK_Pragma, Node_Id),
@@ -1315,7 +1306,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Last_Entity, Node_Id),
         Sm (Related_Instance, Node_Id),
         Sm (Renamed_Or_Alias, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
+        Sm (Scope_Depth_Value, Unat),
         Sm (SPARK_Aux_Pragma, Node_Id),
         Sm (SPARK_Aux_Pragma_Inherited, Flag),
         Sm (SPARK_Pragma, Node_Id),
@@ -1350,7 +1341,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (Interface_Name, Node_Id),
         Sm (Last_Entity, Node_Id),
         Sm (Renamed_Or_Alias, Node_Id),
-        Sm (Scope_Depth_Value, Uint),
+        Sm (Scope_Depth_Value, Unat),
         Sm (SPARK_Pragma, Node_Id),
         Sm (SPARK_Pragma_Inherited, Flag)));
 
@@ -1384,6 +1375,23 @@ begin -- Gen_IL.Gen.Gen_Entities
             (E_Entry,
              E_Entry_Family));
 
+   Union (Evaluable_Kind,
+          Children =>
+            (Exception_Or_Object_Kind,
+             E_Enumeration_Literal,
+             E_Label,
+             Subprogram_Kind));
+   --  Kinds that represent values that can be evaluated
+
+   Union (Global_Name_Kind,
+          Children =>
+            (Constant_Or_Variable_Kind,
+             E_Exception,
+             E_Package,
+             Subprogram_Kind));
+   --  Kinds that can have an Interface_Name that corresponds to a global
+   --  (linker) name.
+
    Union (Named_Access_Kind,
           Children =>
             (E_Access_Type,
@@ -1408,5 +1416,11 @@ begin -- Gen_IL.Gen.Gen_Entities
              E_Record_Subtype,
              E_Record_Type_With_Private,
              E_Record_Subtype_With_Private));
+
+   Union (Subprogram_Type_Or_Kind,
+          Children =>
+            (Subprogram_Kind,
+             E_Subprogram_Body,
+             E_Subprogram_Type));
 
 end Gen_IL.Gen.Gen_Entities;

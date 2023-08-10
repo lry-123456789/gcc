@@ -1,233 +1,142 @@
-2021-09-02  Sandra Loosemore  <sandra@codesourcery.com>
-	    José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+2023-08-07  Nick Alcock  <nick.alcock@oracle.com>
 
-	PR fortran/100907
-	PR fortran/100911
-	PR fortran/100914
-	PR fortran/100915
-	PR fortran/100917
-	* ISO_Fortran_binding-1-tmpl.h (CFI_type_cfunptr): Make equivalent
-	to CFI_type_cptr.
-	* runtime/ISO_Fortran_binding.c (cfi_desc_to_gfc_desc): Fix
-	handling of CFI_type_cptr and CFI_type_cfunptr.  Additional error
-	checking and code cleanup.
-	(gfc_desc_to_cfi_desc): Likewise.  Also correct kind mapping
-	for character, complex, and long double types.
-
-2021-08-27  Iain Sandoe  <iain@sandoe.co.uk>
-
-	* Makefile.am: Use configured libm availability.
-	* Makefile.in: Regenerate.
-	* configure: Regenerate.
-	* configure.ac: Use libtool macro to find libm availability.
-	* libgfortran.spec.in: Use configured libm availability.
-
-2021-08-10  Tobias Burnus  <tobias@codesourcery.com>
-
-	PR libfortran/101305
-	PR fortran/101660
-	PR testsuite/101847
-	* Makefile.am (ISO_Fortran_binding.h): Create include/ in the build dir
-	and copy the include file to it.
-	(clean-local): Add for removing the 'include' directory.
-	* Makefile.in: Regenerate.
-
-2021-07-28  Sandra Loosemore  <sandra@codesourcery.com>
-
-	PR libfortran/101317
-	* runtime/ISO_Fortran_binding.c: Include <inttypes.h>.
-	(CFI_address): Tidy error messages and comments.
-	(CFI_allocate): Likewise.
-	(CFI_deallocate): Likewise.
-	(CFI_establish): Likewise.  Add new checks for validity of
-	elem_len when it's used, plus type argument and extents.
-	(CFI_is_contiguous): Tidy error messages and comments.
-	(CFI_section): Likewise.  Refactor some repetitive code to
-	make it more understandable.
-	(CFI_select_part): Likewise.
-	(CFI_setpointer): Likewise.  Check that source is not an
-	unallocated allocatable array or an assumed-size array.
-
-2021-07-28  Sandra Loosemore  <sandra@codesourcery.com>
-
-	PR libfortran/101310
-	* runtime/ISO_Fortran_binding.c (CFI_section): Fix the base
-	address computation and simplify the code.
-
-2021-07-28  Sandra Loosemore  <sandra@codesourcery.com>
-
-	PR libfortran/101305
-	* runtime/ISO_Fortran_binding.c (CFI_establish): Special-case
-	CFI_type_cptr and CFI_type_cfunptr.  Correct size of long double
-	on targets where it has kind 10.
-
-2021-07-28  Sandra Loosemore  <sandra@codesourcery.com>
-	    Tobias Burnus  <tobias@codesourcery.com>
-
-	PR libfortran/101305
-	* ISO_Fortran_binding.h: Fix hard-coded sizes and split into...
-	* ISO_Fortran_binding-1-tmpl.h: New file.
-	* ISO_Fortran_binding-2-tmpl.h: New file.
-	* ISO_Fortran_binding-3-tmpl.h: New file.
-	* Makefile.am: Add rule for generating ISO_Fortran_binding.h.
-	Adjust pathnames to that file.
-	* Makefile.in: Regenerated.
-	* mk-kinds-h.sh: New file.
-	* runtime/ISO_Fortran_binding.c: Fix include path.
-
-2021-07-26  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
-	    Tobias Burnus  <tobias@codesourcery.com>
-
-	PR fortran/93308
-	PR fortran/93963
-	PR fortran/94327
-	PR fortran/94331
-	PR fortran/97046
-	* runtime/ISO_Fortran_binding.c (cfi_desc_to_gfc_desc): Add code
-	to verify the descriptor. Correct bounds calculation.
-	(gfc_desc_to_cfi_desc): Add code to verify the descriptor.
-
-2021-07-22  Sandra Loosemore  <sandra@codesourcery.com>
-
-	* runtime/ISO_Fortran_binding.c (CFI_allocate): Don't use elem_len
-	for CFI_type_signed_char.
-	(CFI_select_part): Likewise.
-
-2021-07-01  Tobias Burnus  <tobias@codesourcery.com>
-	    Sandra Loosemore  <sandra@codesourcery.com>
-
-	* runtime/ISO_Fortran_binding.c (cfi_desc_to_gfc_desc):
-	Initialize version field to 0.
-	(gfc_desc_to_cfi_desc): Initialize version field to CFI_VERSION.
-
-2021-06-29  Julian Brown  <julian@codesourcery.com>
-
-	PR target/96306
-	* configure.ac: Remove stanza that removes KIND=16 integers for AMD GCN.
 	* configure: Regenerate.
 
-2021-06-22  Sandra Loosemore  <sandra@codesourcery.com>
-	    Tobias Burnus  <tobias@codesourcery.com>
+2023-08-07  Alexander von Gluck IV  <kallisti5@unixzen.com>
 
-	PR fortran/93524
-	* runtime/ISO_Fortran_binding.c (CFI_allocate): Fix
-	sm computation.
+	* configure: Regenerate.
 
-2021-06-08  Martin Liska  <mliska@suse.cz>
+2023-08-07  Nick Alcock  <nick.alcock@oracle.com>
 
-	* intrinsics/chmod.c (chmod_internal): Fix typo.
-	* io/transfer.c (read_sf): Likewise.
+	* configure: Regenerate.
 
-2021-06-05  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+2023-08-07  Nick Alcock  <nick.alcock@oracle.com>
 
-	PR fortran/100120
-	* intrinsics/associated.c (associated): have associated verify if
-	the "span" matches insted of the "elem_len".
-	* libgfortran.h (GFC_DESCRIPTOR_SPAN): add macro to retrive the
-	descriptor "span".
+	* configure: Regenerate.
 
-2021-05-22  Andre Vehreschild  <vehre@gcc.gnu.org>
+2023-08-07  H.J. Lu  <hjl.tools@gmail.com>
 
-	PR fortran/98301
-	* caf/libcaf.h (_gfortran_caf_random_init): New function.
-	* caf/single.c (_gfortran_caf_random_init): New function.
-	* gfortran.map: Added fndecl.
-	* intrinsics/random_init.f90: Implement random_init.
+	* configure: Regenerate.
 
-2021-05-05  Tobias Burnus  <tobias@codesourcery.com>
+2023-08-07  H.J. Lu  <hjl.tools@gmail.com>
 
-	* intrinsics/chmod.c (chmod_internal): Only declare mode_mask var
-	if HAVE_UMASK.
+	* configure: Regenerate.
 
-2021-05-02  Tobias Burnus  <tobias@codesourcery.com>
+2023-07-21  Andrew Pinski  <apinski@marvell.com>
 
-	PR libgomp/100352
-	* io/transfer.c (st_read_done_worker, st_write_done_worker): Add new
-	arg whether to unlock unit.
-	(st_read_done, st_write_done): Call it with true.
-	* io/async.c (async_io): Call it with false.
-	* io/io.h (st_write_done_worker, st_read_done_worker): Update prototype.
+	PR libfortran/110759
+	* ieee/ieee_arithmetic.F90
+	(COMP_INTERFACE): Remove the comma after EXPAND_INTER_MACRO_16
+	and EXPAND_INTER_MACRO_10.
+	(EXPAND_INTER_MACRO_16): Add comma here if 16 byte fp exist.
+	(EXPAND_INTER_MACRO_10): Likewise.
 
-2021-03-12  Tobias Burnus  <tobias@codesourcery.com>
+2023-07-20  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
 
-	* io/transfer.c (st_read_done_worker, st_write_done_worker):
-	Call unlock_unit here, add unit_lock lock around newunit_free call.
-	(st_read_done, st_write_done): Only call unlock_unit when not
-	calling the worker function.
-	* io/unit.c (set_internal_unit): Don't reset the unit_number
-	to the same number as this cause race warnings.
+	* ieee/ieee_arithmetic.F90: Add IEEE_QUIET_* and
+	IEEE_SIGNALING_* functions.
 
-2021-03-05  Harald Anlauf  <anlauf@gmx.de>
+2023-06-11  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
 
-	PR libfortran/99218
-	* m4/matmul_internal.m4: Invoke tuned matmul only for rank(b)>1.
-	* generated/matmul_c10.c: Regenerated.
-	* generated/matmul_c16.c: Likewise.
-	* generated/matmul_c4.c: Likewise.
-	* generated/matmul_c8.c: Likewise.
-	* generated/matmul_i1.c: Likewise.
-	* generated/matmul_i16.c: Likewise.
-	* generated/matmul_i2.c: Likewise.
-	* generated/matmul_i4.c: Likewise.
-	* generated/matmul_i8.c: Likewise.
-	* generated/matmul_r10.c: Likewise.
-	* generated/matmul_r16.c: Likewise.
-	* generated/matmul_r4.c: Likewise.
-	* generated/matmul_r8.c: Likewise.
-	* generated/matmulavx128_c10.c: Likewise.
-	* generated/matmulavx128_c16.c: Likewise.
-	* generated/matmulavx128_c4.c: Likewise.
-	* generated/matmulavx128_c8.c: Likewise.
-	* generated/matmulavx128_i1.c: Likewise.
-	* generated/matmulavx128_i16.c: Likewise.
-	* generated/matmulavx128_i2.c: Likewise.
-	* generated/matmulavx128_i4.c: Likewise.
-	* generated/matmulavx128_i8.c: Likewise.
-	* generated/matmulavx128_r10.c: Likewise.
-	* generated/matmulavx128_r16.c: Likewise.
-	* generated/matmulavx128_r4.c: Likewise.
-	* generated/matmulavx128_r8.c: Likewise.
+	PR libfortran/109373
+	* configure.ac: Remove support for --enable-intermodule
+	* Makefile.am: Remove onestep path.
+	* configure: Regenerate.
+	* Makefile.in: Regenerate.
 
-2021-03-03  Vittorio Zecca  <zeccav@gmail.com>
-	    Tobias Burnus  <tobias@codesourcery.com>
+2023-06-10  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
 
-	PR libfortran/81986
-	* runtime/string.c (gfc_itoa): Cast to unsigned before
-	negating.
+	* ieee/ieee_arithmetic.F90: Add IEEE_MIN_NUM, IEEE_MAX_NUM,
+	IEEE_MIN_NUM_MAG, and IEEE_MAX_NUM_MAG functions.
 
-2021-02-12  Steve Kargl  <sgk@troutmask.apl.washington.edu>
+2023-05-12  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
 
-	PR libfortran/95647
-	* ieee/ieee_arithmetic.F90: Flip interfaces of operators .eq. to
-	== and .ne. to /= .
+	PR fortran/109662
+	* io/unit.c (set_internal_unit): Set the internal unit
+	last_char to zero so that previous EOF characters do not
+	influence the next read.
 
-2021-02-11  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+2023-05-08  Bernhard Reutner-Fischer  <aldot@gcc.gnu.org>
 
-	PR libfortran/98825
-	* io/transfer.c (next_record_w): Insert check for seen_dollar and if
-	so, skip issueing next record.
+	* caf/single.c (_gfortran_caf_register): Fix coding style.
+	* io/async.c (update_pdt, async_io): Likewise.
+	* io/format.c (free_format_data): Likewise.
+	* io/transfer.c (st_read_done_worker, st_write_done_worker): Likewise.
+	* io/unix.c (mem_close): Likewise.
 
-2021-01-27  Harris Snyder  <hsnyder@structura.bio>
+2023-05-08  Bernhard Reutner-Fischer  <aldot@gcc.gnu.org>
 
-	* runtime/ISO_Fortran_binding.c (CFI_establish): fixed
-	strides for rank >2 arrays.
+	* caf/single.c (_gfortran_caf_register): Call free() unconditionally.
+	* io/async.c (update_pdt, async_io): Likewise.
+	* io/format.c (free_format_data): Likewise.
+	* io/transfer.c (st_read_done_worker, st_write_done_worker): Likewise.
+	* io/unix.c (mem_close): Likewise.
 
-2021-01-15  Harris Snyder  <hsnyder@structura.bio>
+2023-05-08  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
 
-	* runtime/ISO_Fortran_binding.c (CFI_establish): Fixed signed
-	  char arrays. Signed char or uint8_t arrays would cause
-	  crashes unless an element size is specified.
+	PR fortran/109662
+	* io/list_read.c: Add check for a semicolon after a namelist
+	name in read input. Issue a runtime error message.
 
-2021-01-05  Samuel Thibault  <samuel.thibault@ens-lyon.org>
+2023-05-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
 
-	* configure: Re-generate.
+	PR fortran/109662
+	* io/list_read.c: Add a check for a comma after a namelist
+	name in read input. Issue a runtime error message.
 
-2021-01-01  Jakub Jelinek  <jakub@redhat.com>
+2023-02-28  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
 
-	* ChangeLog-2020: Rotate ChangeLog.  New file.
+	* generated/pack_c10.c (pack_c10): Regenerated.
+	* generated/pack_c16.c (pack_c16): Regenerated.
+	* generated/pack_c17.c (pack_c17): Regenerated.
+	* generated/pack_c4.c (pack_c4): Regenerated.
+	* generated/pack_c8.c (pack_c8): Regenerated.
+	* generated/pack_i1.c (pack_i1): Regenerated.
+	* generated/pack_i16.c (pack_i16): Regenerated.
+	* generated/pack_i2.c (pack_i2): Regenerated.
+	* generated/pack_i4.c (pack_i4): Regenerated.
+	* generated/pack_i8.c (pack_i8): Regenerated.
+	* generated/pack_r10.c (pack_r10): Regenerated.
+	* generated/pack_r16.c (pack_r16): Regenerated.
+	* generated/pack_r17.c (pack_r17): Regenerated.
+	* generated/pack_r4.c (pack_r4): Regenerated.
+	* generated/pack_r8.c (pack_r8): Regenerated.
+	* generated/spread_c10.c (spread_c10): Regenerated.
+	* generated/spread_c16.c (spread_c16): Regenerated.
+	* generated/spread_c17.c (spread_c17): Regenerated.
+	* generated/spread_c4.c (spread_c4): Regenerated.
+	* generated/spread_c8.c (spread_c8): Regenerated.
+	* generated/spread_i1.c (spread_i1): Regenerated.
+	* generated/spread_i16.c (spread_i16): Regenerated.
+	* generated/spread_i2.c (spread_i2): Regenerated.
+	* generated/spread_i4.c (spread_i4): Regenerated.
+	* generated/spread_i8.c (spread_i8): Regenerated.
+	* generated/spread_r10.c (spread_r10): Regenerated.
+	* generated/spread_r16.c (spread_r16): Regenerated.
+	* generated/spread_r17.c (spread_r17): Regenerated.
+	* generated/spread_r4.c (spread_r4): Regenerated.
+	* generated/spread_r8.c (spread_r8): Regenerated.
+	* intrinsics/execute_command_line.c (execute_command_line_i4),
+	(execute_command_line_i8): Set estat_initial to zero.
+	* intrinsics/pack_generic.c (pack_internal): Set sstride[0] and
+	mstride[0] to zero.
+	* intrinsics/spread_generic.c (spread_internal): Set sstride[0].
+	* m4/pack.m4: Set sstride[0] and mstride[0].
+	* m4/spread.m4: Set sstride[0].
+
+2023-01-18  Tobias Burnus  <tobias@codesourcery.com>
+
+	* intrinsics/execute_command_line.c (execute_command_line): On
+	Windows, regard system()'s return value of 9009 as EXEC_INVALIDCOMMAND.
+
+2023-01-07  LIU Hao  <lh_mouse@126.com>
+
+	PR middle-end/108300
+	* intrinsics/sleep.c: Define `WIN32_LEAN_AND_MEAN` before
+	<windows.h>.
 
 
-Copyright (C) 2021 Free Software Foundation, Inc.
+Copyright (C) 2023 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

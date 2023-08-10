@@ -1,5 +1,5 @@
 /* d-tree.h -- Definitions and declarations for code generation.
-   Copyright (C) 2006-2021 Free Software Foundation, Inc.
+   Copyright (C) 2006-2023 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -47,7 +47,6 @@ typedef Array <Expression *> Expressions;
 
 /* Usage of TREE_LANG_FLAG_?:
    0: METHOD_CALL_EXPR
-   1: CALL_EXPR_ARGS_ORDERED (in CALL_EXPR).
 
    Usage of TYPE_LANG_FLAG_?:
    0: TYPE_SHARED
@@ -57,6 +56,9 @@ typedef Array <Expression *> Expressions;
    3: TYPE_DYNAMIC_ARRAY (in RECORD_TYPE).
    4: TYPE_DELEGATE (in RECORD_TYPE).
    5: TYPE_ASSOCIATIVE_ARRAY (in RECORD_TYPE).
+
+   Usage of TYPE_LANG_SLOT_?:
+   1: TYPE_FORWARD_REFERENCES (in RECORD_TYPE, UNION_TYPE).
 
    Usage of DECL_LANG_FLAG_?:
    0: LABEL_VARIABLE_CASE (in LABEL_DECL).
@@ -68,6 +70,10 @@ typedef Array <Expression *> Expressions;
 
 #define VAR_OR_FUNCTION_DECL_CHECK(NODE) \
   TREE_CHECK2 (NODE, VAR_DECL, FUNCTION_DECL)
+
+#define AGGREGATE_OR_ENUM_TYPE_CHECK(NODE) \
+  TREE_CHECK4 (NODE, RECORD_TYPE, UNION_TYPE, \
+	       QUAL_UNION_TYPE, ENUMERAL_TYPE)
 
 /* The kinds of scopes we recognize.  */
 
@@ -351,11 +357,6 @@ lang_tree_node
 #define METHOD_CALL_EXPR(NODE) \
   (TREE_LANG_FLAG_0 (NODE))
 
-/* True if all arguments in a call expression should be evaluated in the
-   order they are given (left to right).  */
-#define CALL_EXPR_ARGS_ORDERED(NODE) \
-  (TREE_LANG_FLAG_1 (CALL_EXPR_CHECK (NODE)))
-
 /* True if the type was declared 'shared'.  */
 #define TYPE_SHARED(NODE) \
   (TYPE_LANG_FLAG_0 (NODE))
@@ -384,6 +385,11 @@ lang_tree_node
 #define TYPE_ASSOCIATIVE_ARRAY(NODE) \
   (TYPE_LANG_FLAG_5 (RECORD_TYPE_CHECK (NODE)))
 
+/* In an incomplete RECORD_TYPE, UNION_TYPE, or ENUMERAL_TYPE, a list of field
+   declarations whose type would be completed by completing that type.  */
+#define TYPE_FORWARD_REFERENCES(NODE) \
+  (TYPE_LANG_SLOT_1 (AGGREGATE_OR_ENUM_TYPE_CHECK (NODE)))
+
 /* True if the decl is a variable case label decl.  */
 #define LABEL_VARIABLE_CASE(NODE) \
   (DECL_LANG_FLAG_0 (LABEL_DECL_CHECK (NODE)))
@@ -398,7 +404,7 @@ lang_tree_node
 
 /* True if the decl comes from a template instance.  */
 #define DECL_INSTANTIATED(NODE) \
-  (DECL_LANG_FLAG_1 (VAR_OR_FUNCTION_DECL_CHECK (NODE)))
+  (DECL_LANG_FLAG_2 (VAR_OR_FUNCTION_DECL_CHECK (NODE)))
 
 enum d_tree_index
 {
@@ -430,6 +436,7 @@ enum d_tree_index
 
   DTI_ARRAY_TYPE,
   DTI_NULL_ARRAY,
+  DTI_BOTTOM_TYPE,
 
   DTI_MAX
 };
@@ -465,6 +472,8 @@ extern GTY(()) tree d_global_trees[DTI_MAX];
 #define array_type_node			d_global_trees[DTI_ARRAY_TYPE]
 /* Null initializer for dynamic arrays.  */
 #define null_array_node			d_global_trees[DTI_NULL_ARRAY]
+/* The bottom type, referred to as `noreturn` in code.  */
+#define noreturn_type_node		d_global_trees[DTI_BOTTOM_TYPE]
 
 /* A prefix for internal variables, which are not user-visible.  */
 #if !defined (NO_DOT_IN_LABEL)
@@ -540,7 +549,7 @@ extern tree stabilize_expr (tree *);
 extern tree build_target_expr (tree, tree);
 extern tree force_target_expr (tree);
 extern tree build_address (tree);
-extern tree d_mark_addressable (tree);
+extern tree d_mark_addressable (tree, bool = true);
 extern tree d_mark_used (tree);
 extern tree d_mark_read (tree);
 extern tree build_memcmp_call (tree, tree, tree);
@@ -567,9 +576,10 @@ extern tree size_mult_expr (tree, tree);
 extern tree real_part (tree);
 extern tree imaginary_part (tree);
 extern tree complex_expr (tree, tree, tree);
+extern tree underlying_complex_expr (tree, tree);
 extern tree indirect_ref (tree, tree);
 extern tree build_deref (tree);
-extern tree build_array_index (tree, tree);
+extern tree build_pointer_index (tree, tree);
 extern tree build_offset_op (tree_code, tree, tree);
 extern tree build_offset (tree, tree);
 extern tree build_memref (tree, tree, tree);
@@ -583,7 +593,6 @@ extern tree build_bounds_index_condition (IndexExp *, tree, tree);
 extern tree build_bounds_slice_condition (SliceExp *, tree, tree, tree);
 extern bool array_bounds_check (void);
 extern bool checkaction_trap_p (void);
-extern tree bind_expr (tree, tree);
 extern TypeFunction *get_function_type (Type *);
 extern bool call_by_alias_p (FuncDeclaration *, FuncDeclaration *);
 extern tree d_build_call_expr (FuncDeclaration *, tree, Expressions *);
@@ -617,7 +626,6 @@ extern void add_import_paths (const char *, const char *, bool);
 
 /* In d-lang.cc.  */
 extern void d_add_builtin_module (Module *);
-extern void d_add_entrypoint_module (Module *, Module *);
 extern d_tree_node_structure_enum d_tree_node_structure (lang_tree_node *);
 extern struct lang_type *build_lang_type (Type *);
 extern struct lang_decl *build_lang_decl (Declaration *);
@@ -647,6 +655,7 @@ extern tree build_artificial_decl (tree, tree, const char * = NULL);
 extern tree create_field_decl (tree, const char *, int, int);
 extern void build_type_decl (tree, Dsymbol *);
 extern void set_linkage_for_decl (tree);
+extern void set_visibility_for_decl (tree, Dsymbol *);
 
 /* In expr.cc.  */
 extern tree build_expr (Expression *, bool = false, bool = false);
@@ -664,6 +673,7 @@ extern tree maybe_expand_intrinsic (tree);
 extern void build_module_tree (Module *);
 extern tree d_module_context (void);
 extern void register_module_decl (Declaration *);
+extern void d_defer_declaration (Declaration *);
 extern void d_finish_compilation (tree *, int);
 
 /* In runtime.cc.  */
@@ -676,9 +686,10 @@ extern tree layout_classinfo (ClassDeclaration *);
 extern unsigned base_vtable_offset (ClassDeclaration *, BaseClass *);
 extern tree get_typeinfo_decl (TypeInfoDeclaration *);
 extern tree get_classinfo_decl (ClassDeclaration *);
-extern void check_typeinfo_type (const Loc &, Scope *);
-extern tree build_typeinfo (const Loc &, Type *);
-extern void create_typeinfo (Type *, Module *);
+extern void check_typeinfo_type (const Loc &, Scope *, Expression * = NULL);
+extern tree build_typeinfo (const Loc &, Type *, Expression * = NULL);
+extern tree build_typeinfo (Expression *, Type *);
+extern void create_typeinfo (Type *, Module *, bool = true);
 extern void create_tinfo_types (Module *);
 extern void layout_cpp_typeinfo (ClassDeclaration *);
 extern tree get_cpp_typeinfo_decl (ClassDeclaration *);

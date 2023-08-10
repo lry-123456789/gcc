@@ -1,5 +1,5 @@
 /* Structure for saving state for a nested function.
-   Copyright (C) 1989-2021 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -270,14 +270,7 @@ struct GTY(()) function {
   /* Value histograms attached to particular statements.  */
   htab_t GTY((skip)) value_histograms;
 
-  /* Different from normal TODO_flags which are handled right at the
-     beginning or the end of one pass execution, the pending_TODOs
-     are passed down in the pipeline until one of its consumers can
-     perform the requested action.  Consumers should then clear the
-     flags for the actions that they have taken.  */
-  unsigned int pending_TODOs;
-
-  /* For function.c.  */
+  /* For function.cc.  */
 
   /* Points to the FUNCTION_DECL of this function.  */
   tree decl;
@@ -337,6 +330,13 @@ struct GTY(()) function {
   /* Properties used by the pass manager.  */
   unsigned int curr_properties;
   unsigned int last_verified;
+
+  /* Different from normal TODO_flags which are handled right at the
+     beginning or the end of one pass execution, the pending_TODOs
+     are passed down in the pipeline until one of its consumers can
+     perform the requested action.  Consumers should then clear the
+     flags for the actions that they have taken.  */
+  unsigned int pending_TODOs;
 
   /* Non-null if the function does something that would prevent it from
      being copied; this applies to both versioning and inlining.  Set to
@@ -438,6 +438,10 @@ struct GTY(()) function {
 
   /* Set if there are any OMP_TARGET regions in the function.  */
   unsigned int has_omp_target : 1;
+
+  /* Set for artificial function created for [[assume (cond)]].
+     These should be GIMPLE optimized, but not expanded to RTL.  */
+  unsigned int assume_function : 1;
 };
 
 /* Add the decl D to the local_decls list of FUN.  */
@@ -653,11 +657,11 @@ extern rtx get_hard_reg_initial_val (machine_mode, unsigned int);
 extern rtx has_hard_reg_initial_val (machine_mode, unsigned int);
 
 /* Called from gimple_expand_cfg.  */
-extern unsigned int emit_initial_value_sets (void);
+extern void emit_initial_value_sets (void);
 
 extern bool initial_value_entry (int i, rtx *, rtx *);
 extern void instantiate_decl_rtl (rtx x);
-extern int aggregate_value_p (const_tree, const_tree);
+extern bool aggregate_value_p (const_tree, const_tree);
 extern bool use_register_for_decl (const_tree);
 extern gimple_seq gimplify_parameters (gimple_seq *);
 extern void locate_and_pad_parm (machine_mode, tree, int, int, int,
@@ -683,7 +687,7 @@ extern void pop_cfun (void);
 extern int get_next_funcdef_no (void);
 extern int get_last_funcdef_no (void);
 extern void allocate_struct_function (tree, bool);
-extern void push_struct_function (tree fndecl);
+extern void push_struct_function (tree fndecl, bool = false);
 extern void push_dummy_function (bool);
 extern void pop_dummy_function (void);
 extern void init_dummy_function_start (void);
@@ -698,9 +702,9 @@ extern void clobber_return_register (void);
 extern void expand_function_end (void);
 extern rtx get_arg_pointer_save_area (void);
 extern void maybe_copy_prologue_epilogue_insn (rtx, rtx);
-extern int prologue_contains (const rtx_insn *);
-extern int epilogue_contains (const rtx_insn *);
-extern int prologue_epilogue_contains (const rtx_insn *);
+extern bool prologue_contains (const rtx_insn *);
+extern bool epilogue_contains (const rtx_insn *);
+extern bool prologue_epilogue_contains (const rtx_insn *);
 extern void record_prologue_seq (rtx_insn *);
 extern void record_epilogue_seq (rtx_insn *);
 extern void emit_return_into_block (bool simple_p, basic_block bb);
@@ -719,15 +723,6 @@ extern const char *current_function_name (void);
 
 extern void used_types_insert (tree);
 
-/* Returns the currently active range access class.  When there is no active
-   range class, global ranges are used.  Never returns null.  */
-
-ATTRIBUTE_RETURNS_NONNULL inline range_query *
-get_range_query (const struct function *fun)
-{
-  return fun->x_range_query;
-}
-
-extern range_query *get_global_range_query ();
+extern bool currently_expanding_function_start;
 
 #endif  /* GCC_FUNCTION_H */

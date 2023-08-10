@@ -28,6 +28,7 @@ class Map_type;
 class Struct_type;
 class Struct_field;
 class Expression_list;
+class Const_expression;
 class Var_expression;
 class Enclosed_var_expression;
 class Temporary_reference_expression;
@@ -626,6 +627,20 @@ class Expression
   is_type_expression() const
   { return this->classification_ == EXPRESSION_TYPE; }
 
+  // If this is a const reference, return the Const_expression
+  // structure.  Otherwise, return NULL.  This is a controlled dynamic
+  // cast.
+  Const_expression*
+  const_expression()
+  { return this->convert<Const_expression, EXPRESSION_CONST_REFERENCE>(); }
+
+  const Const_expression*
+  const_expression() const
+  {
+    return this->convert<const Const_expression,
+			 EXPRESSION_CONST_REFERENCE>();
+  }
+
   // If this is a variable reference, return the Var_expression
   // structure.  Otherwise, return NULL.  This is a controlled dynamic
   // cast.
@@ -999,7 +1014,9 @@ class Expression
   determine_type_no_context();
 
   // Return the current type of the expression.  This may be changed
-  // by determine_type.
+  // by determine_type.  This should not be called before the lowering
+  // pass, unless the is_type_expression method returns true (i.e.,
+  // this is an EXPRESSION_TYPE).
   Type*
   type()
   { return this->do_type(); }
@@ -1449,6 +1466,96 @@ class Parser_expression : public Expression
   Bexpression*
   do_get_backend(Translate_context*)
   { go_unreachable(); }
+};
+
+// A reference to a const in an expression.
+
+class Const_expression : public Expression
+{
+ public:
+  Const_expression(Named_object* constant, Location location)
+    : Expression(EXPRESSION_CONST_REFERENCE, location),
+      constant_(constant), type_(NULL), seen_(false)
+  { }
+
+  Named_object*
+  named_object()
+  { return this->constant_; }
+
+  const Named_object*
+  named_object() const
+  { return this->constant_; }
+
+  // Check that the initializer does not refer to the constant itself.
+  void
+  check_for_init_loop();
+
+ protected:
+  int
+  do_traverse(Traverse*);
+
+  Expression*
+  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+
+  bool
+  do_is_constant() const
+  { return true; }
+
+  bool
+  do_is_zero_value() const;
+
+  bool
+  do_is_static_initializer() const
+  { return true; }
+
+  bool
+  do_numeric_constant_value(Numeric_constant* nc) const;
+
+  bool
+  do_string_constant_value(std::string* val) const;
+
+  bool
+  do_boolean_constant_value(bool* val) const;
+
+  Type*
+  do_type();
+
+  // The type of a const is set by the declaration, not the use.
+  void
+  do_determine_type(const Type_context*);
+
+  void
+  do_check_types(Gogo*);
+
+  Expression*
+  do_copy()
+  { return this; }
+
+  Bexpression*
+  do_get_backend(Translate_context* context);
+
+  int
+  do_inlining_cost() const
+  { return 1; }
+
+  // When exporting a reference to a const as part of a const
+  // expression, we export the value.  We ignore the fact that it has
+  // a name.
+  void
+  do_export(Export_function_body* efb) const;
+
+  void
+  do_dump_expression(Ast_dump_context*) const;
+
+ private:
+  // The constant.
+  Named_object* constant_;
+  // The type of this reference.  This is used if the constant has an
+  // abstract type.
+  Type* type_;
+  // Used to prevent infinite recursion when a constant incorrectly
+  // refers to itself.
+  mutable bool seen_;
 };
 
 // An expression which is simply a variable.
@@ -3053,7 +3160,7 @@ class Array_index_expression : public Expression
 			 Expression* end, Expression* cap, Location location)
     : Expression(EXPRESSION_ARRAY_INDEX, location),
       array_(array), start_(start), end_(end), cap_(cap), type_(NULL),
-      is_lvalue_(false), needs_bounds_check_(true), is_flattened_(false)
+      needs_bounds_check_(true), is_flattened_(false)
   { }
 
   // Return the array.
@@ -3084,18 +3191,6 @@ class Array_index_expression : public Expression
   const Expression*
   end() const
   { return this->end_; }
-
-  // Return whether this array index expression appears in an lvalue
-  // (left hand side of assignment) context.
-  bool
-  is_lvalue() const
-  { return this->is_lvalue_; }
-
-  // Update this array index expression to indicate that it appears
-  // in a left-hand-side or lvalue context.
-  void
-  set_is_lvalue()
-  { this->is_lvalue_ = true; }
 
   void
   set_needs_bounds_check(bool b)
@@ -3172,8 +3267,6 @@ class Array_index_expression : public Expression
   Expression* cap_;
   // The type of the expression.
   Type* type_;
-  // Whether expr appears in an lvalue context.
-  bool is_lvalue_;
   // Whether bounds check is needed.
   bool needs_bounds_check_;
   // Whether this has already been flattened.
@@ -3403,6 +3496,10 @@ class Bound_method_expression : public Expression
   static Named_object*
   create_thunk(Gogo*, const Method* method, Named_object* function);
 
+  // Look up a thunk.
+  static Named_object*
+  lookup_thunk(Named_object* function);
+
  protected:
   int
   do_traverse(Traverse*);
@@ -3575,6 +3672,10 @@ class Interface_field_reference_expression : public Expression
   // part of a method value.
   static Named_object*
   create_thunk(Gogo*, Interface_type* type, const std::string& name);
+
+  // Look up a thunk.
+  static Named_object*
+  lookup_thunk(Interface_type* type, const std::string& name);
 
   // Return an expression for the pointer to the function to call.
   Expression*
@@ -4263,8 +4364,7 @@ class Slice_value_expression : public Expression
   { return this->type_; }
 
   void
-  do_determine_type(const Type_context*)
-  { }
+  do_determine_type(const Type_context*);
 
   Expression*
   do_copy();
@@ -4309,12 +4409,16 @@ class Slice_info_expression : public Expression
   { return this->slice_info_; }
 
  protected:
+  int
+  do_traverse(Traverse* traverse)
+  { return Expression::traverse(&this->slice_, traverse); }
+
   Type*
   do_type();
 
   void
   do_determine_type(const Type_context*)
-  { }
+  { this->slice_->determine_type_no_context(); }
 
   Expression*
   do_copy()

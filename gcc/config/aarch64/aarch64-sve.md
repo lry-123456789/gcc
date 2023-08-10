@@ -1,5 +1,5 @@
 ;; Machine description for AArch64 SVE.
-;; Copyright (C) 2009-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2023 Free Software Foundation, Inc.
 ;; Contributed by ARM Ltd.
 ;;
 ;; This file is part of GCC.
@@ -1418,64 +1418,79 @@
 ;; Predicated gather loads for 32-bit elements.  Operand 3 is true for
 ;; unsigned extension and false for signed extension.
 (define_insn "mask_gather_load<mode><v_int_container>"
-  [(set (match_operand:SVE_4 0 "register_operand" "=w, w, w, w, w, w")
+  [(set (match_operand:SVE_4 0 "register_operand")
 	(unspec:SVE_4
-	  [(match_operand:VNx4BI 5 "register_operand" "Upl, Upl, Upl, Upl, Upl, Upl")
-	   (match_operand:DI 1 "aarch64_sve_gather_offset_<Vesize>" "Z, vgw, rk, rk, rk, rk")
-	   (match_operand:VNx4SI 2 "register_operand" "w, w, w, w, w, w")
-	   (match_operand:DI 3 "const_int_operand" "Ui1, Ui1, Z, Ui1, Z, Ui1")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>" "Ui1, Ui1, Ui1, Ui1, i, i")
+	  [(match_operand:VNx4BI 5 "register_operand")
+	   (match_operand:DI 1 "aarch64_sve_gather_offset_<Vesize>")
+	   (match_operand:VNx4SI 2 "register_operand")
+	   (match_operand:DI 3 "const_int_operand")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>")
 	   (mem:BLK (scratch))]
 	  UNSPEC_LD1_GATHER))]
   "TARGET_SVE"
-  "@
-   ld1<Vesize>\t%0.s, %5/z, [%2.s]
-   ld1<Vesize>\t%0.s, %5/z, [%2.s, #%1]
-   ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw]
-   ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw]
-   ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
-   ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5  ]
+     [&w, Z,   w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%2.s]
+     [?w, Z,   0, Ui1, Ui1, Upl] ^
+     [&w, vgw, w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%2.s, #%1]
+     [?w, vgw, 0, Ui1, Ui1, Upl] ^
+     [&w, rk,  w, Z,   Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw]
+     [?w, rk,  0, Z,   Ui1, Upl] ^
+     [&w, rk,  w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw]
+     [?w, rk,  0, Ui1, Ui1, Upl] ^
+     [&w, rk,  w, Z,   i,   Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
+     [?w, rk,  0, Z,   i,   Upl] ^
+     [&w, rk,  w, Ui1, i,   Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw %p4]
+     [?w, rk,  0, Ui1, i,   Upl] ^
+  }
 )
 
 ;; Predicated gather loads for 64-bit elements.  The value of operand 3
 ;; doesn't matter in this case.
 (define_insn "mask_gather_load<mode><v_int_container>"
-  [(set (match_operand:SVE_2 0 "register_operand" "=w, w, w, w")
+  [(set (match_operand:SVE_2 0 "register_operand")
 	(unspec:SVE_2
-	  [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl, Upl, Upl")
-	   (match_operand:DI 1 "aarch64_sve_gather_offset_<Vesize>" "Z, vgd, rk, rk")
-	   (match_operand:VNx2DI 2 "register_operand" "w, w, w, w")
+	  [(match_operand:VNx2BI 5 "register_operand")
+	   (match_operand:DI 1 "aarch64_sve_gather_offset_<Vesize>")
+	   (match_operand:VNx2DI 2 "register_operand")
 	   (match_operand:DI 3 "const_int_operand")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>" "Ui1, Ui1, Ui1, i")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>")
 	   (mem:BLK (scratch))]
 	  UNSPEC_LD1_GATHER))]
   "TARGET_SVE"
-  "@
-   ld1<Vesize>\t%0.d, %5/z, [%2.d]
-   ld1<Vesize>\t%0.d, %5/z, [%2.d, #%1]
-   ld1<Vesize>\t%0.d, %5/z, [%1, %2.d]
-   ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, lsl %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, Z,   w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%2.d]
+     [?w, Z,   0, i, Ui1, Upl] ^
+     [&w, vgd, w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%2.d, #%1]
+     [?w, vgd, 0, i, Ui1, Upl] ^
+     [&w, rk,  w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d]
+     [?w, rk,  0, i, Ui1, Upl] ^
+     [&w, rk,  w, i, i,   Upl] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, lsl %p4]
+     [?w, rk,  0, i, i,   Upl] ^
+  }
 )
 
 ;; Likewise, but with the offset being extended from 32 bits.
 (define_insn_and_rewrite "*mask_gather_load<mode><v_int_container>_<su>xtw_unpacked"
-  [(set (match_operand:SVE_2 0 "register_operand" "=w, w")
+  [(set (match_operand:SVE_2 0 "register_operand")
 	(unspec:SVE_2
-	  [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-	   (match_operand:DI 1 "register_operand" "rk, rk")
+	  [(match_operand:VNx2BI 5 "register_operand")
+	   (match_operand:DI 1 "register_operand")
 	   (unspec:VNx2DI
 	     [(match_operand 6)
 	      (ANY_EXTEND:VNx2DI
-		(match_operand:VNx2SI 2 "register_operand" "w, w"))]
+		(match_operand:VNx2SI 2 "register_operand"))]
 	     UNSPEC_PRED_X)
 	   (match_operand:DI 3 "const_int_operand")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>" "Ui1, i")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>")
 	   (mem:BLK (scratch))]
 	  UNSPEC_LD1_GATHER))]
   "TARGET_SVE"
-  "@
-   ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, <su>xtw]
-   ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, <su>xtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, <su>xtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, <su>xtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
   "&& !CONSTANT_P (operands[6])"
   {
     operands[6] = CONSTM1_RTX (VNx2BImode);
@@ -1485,24 +1500,27 @@
 ;; Likewise, but with the offset being truncated to 32 bits and then
 ;; sign-extended.
 (define_insn_and_rewrite "*mask_gather_load<mode><v_int_container>_sxtw"
-  [(set (match_operand:SVE_2 0 "register_operand" "=w, w")
+  [(set (match_operand:SVE_2 0 "register_operand")
 	(unspec:SVE_2
-	  [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-	   (match_operand:DI 1 "register_operand" "rk, rk")
+	  [(match_operand:VNx2BI 5 "register_operand")
+	   (match_operand:DI 1 "register_operand")
 	   (unspec:VNx2DI
 	     [(match_operand 6)
 	      (sign_extend:VNx2DI
 		(truncate:VNx2SI
-		  (match_operand:VNx2DI 2 "register_operand" "w, w")))]
+		  (match_operand:VNx2DI 2 "register_operand")))]
 	     UNSPEC_PRED_X)
 	   (match_operand:DI 3 "const_int_operand")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>" "Ui1, i")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>")
 	   (mem:BLK (scratch))]
 	  UNSPEC_LD1_GATHER))]
   "TARGET_SVE"
-  "@
-   ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw]
-   ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
   "&& !CONSTANT_P (operands[6])"
   {
     operands[6] = CONSTM1_RTX (VNx2BImode);
@@ -1512,21 +1530,24 @@
 ;; Likewise, but with the offset being truncated to 32 bits and then
 ;; zero-extended.
 (define_insn "*mask_gather_load<mode><v_int_container>_uxtw"
-  [(set (match_operand:SVE_2 0 "register_operand" "=w, w")
+  [(set (match_operand:SVE_2 0 "register_operand")
 	(unspec:SVE_2
-	  [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-	   (match_operand:DI 1 "register_operand" "rk, rk")
+	  [(match_operand:VNx2BI 5 "register_operand")
+	   (match_operand:DI 1 "register_operand")
 	   (and:VNx2DI
-	     (match_operand:VNx2DI 2 "register_operand" "w, w")
+	     (match_operand:VNx2DI 2 "register_operand")
 	     (match_operand:VNx2DI 6 "aarch64_sve_uxtw_immediate"))
 	   (match_operand:DI 3 "const_int_operand")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>" "Ui1, i")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_<Vesize>")
 	   (mem:BLK (scratch))]
 	  UNSPEC_LD1_GATHER))]
   "TARGET_SVE"
-  "@
-   ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw]
-   ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
 )
 
 ;; -------------------------------------------------------------------------
@@ -1544,27 +1565,34 @@
 ;; Predicated extending gather loads for 32-bit elements.  Operand 3 is
 ;; true for unsigned extension and false for signed extension.
 (define_insn_and_rewrite "@aarch64_gather_load_<ANY_EXTEND:optab><SVE_4HSI:mode><SVE_4BHI:mode>"
-  [(set (match_operand:SVE_4HSI 0 "register_operand" "=w, w, w, w, w, w")
+  [(set (match_operand:SVE_4HSI 0 "register_operand")
 	(unspec:SVE_4HSI
-	  [(match_operand:VNx4BI 6 "general_operand" "UplDnm, UplDnm, UplDnm, UplDnm, UplDnm, UplDnm")
+	  [(match_operand:VNx4BI 6 "general_operand")
 	   (ANY_EXTEND:SVE_4HSI
 	     (unspec:SVE_4BHI
-	       [(match_operand:VNx4BI 5 "register_operand" "Upl, Upl, Upl, Upl, Upl, Upl")
-		(match_operand:DI 1 "aarch64_sve_gather_offset_<SVE_4BHI:Vesize>" "Z, vg<SVE_4BHI:Vesize>, rk, rk, rk, rk")
-		(match_operand:VNx4SI 2 "register_operand" "w, w, w, w, w, w")
-		(match_operand:DI 3 "const_int_operand" "Ui1, Ui1, Z, Ui1, Z, Ui1")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_4BHI:Vesize>" "Ui1, Ui1, Ui1, Ui1, i, i")
+	       [(match_operand:VNx4BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_sve_gather_offset_<SVE_4BHI:Vesize>")
+		(match_operand:VNx4SI 2 "register_operand")
+		(match_operand:DI 3 "const_int_operand")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_4BHI:Vesize>")
 		(mem:BLK (scratch))]
 	       UNSPEC_LD1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE && (~<SVE_4HSI:narrower_mask> & <SVE_4BHI:self_mask>) == 0"
-  "@
-   ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%2.s]
-   ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%2.s, #%1]
-   ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw]
-   ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw]
-   ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
-   ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5, 6]
+     [&w, Z,                   w, Ui1, Ui1, Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%2.s]
+     [?w, Z,                   0, Ui1, Ui1, Upl, UplDnm] ^
+     [&w, vg<SVE_4BHI:Vesize>, w, Ui1, Ui1, Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%2.s, #%1]
+     [?w, vg<SVE_4BHI:Vesize>, 0, Ui1, Ui1, Upl, UplDnm] ^
+     [&w, rk,                  w, Z,   Ui1, Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw]
+     [?w, rk,                  0, Z,   Ui1, Upl, UplDnm] ^
+     [&w, rk,                  w, Ui1, Ui1, Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw]
+     [?w, rk,                  0, Ui1, Ui1, Upl, UplDnm] ^
+     [&w, rk,                  w, Z,   i,   Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
+     [?w, rk,                  0, Z,   i,   Upl, UplDnm] ^
+     [&w, rk,                  w, Ui1, i,   Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_4BHI:Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw %p4]
+     [?w, rk,                  0, Ui1, i,   Upl, UplDnm] ^
+  }
   "&& !CONSTANT_P (operands[6])"
   {
     operands[6] = CONSTM1_RTX (VNx4BImode);
@@ -1574,25 +1602,30 @@
 ;; Predicated extending gather loads for 64-bit elements.  The value of
 ;; operand 3 doesn't matter in this case.
 (define_insn_and_rewrite "@aarch64_gather_load_<ANY_EXTEND:optab><SVE_2HSDI:mode><SVE_2BHSI:mode>"
-  [(set (match_operand:SVE_2HSDI 0 "register_operand" "=w, w, w, w")
+  [(set (match_operand:SVE_2HSDI 0 "register_operand")
 	(unspec:SVE_2HSDI
-	  [(match_operand:VNx2BI 6 "general_operand" "UplDnm, UplDnm, UplDnm, UplDnm")
+	  [(match_operand:VNx2BI 6 "general_operand")
 	   (ANY_EXTEND:SVE_2HSDI
 	     (unspec:SVE_2BHSI
-	       [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl, Upl, Upl")
-		(match_operand:DI 1 "aarch64_sve_gather_offset_<SVE_2BHSI:Vesize>" "Z, vg<SVE_2BHSI:Vesize>, rk, rk")
-		(match_operand:VNx2DI 2 "register_operand" "w, w, w, w")
+	       [(match_operand:VNx2BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_sve_gather_offset_<SVE_2BHSI:Vesize>")
+		(match_operand:VNx2DI 2 "register_operand")
 		(match_operand:DI 3 "const_int_operand")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_2BHSI:Vesize>" "Ui1, Ui1, Ui1, i")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_2BHSI:Vesize>")
 		(mem:BLK (scratch))]
 	       UNSPEC_LD1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE && (~<SVE_2HSDI:narrower_mask> & <SVE_2BHSI:self_mask>) == 0"
-  "@
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%2.d]
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%2.d, #%1]
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d]
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, lsl %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5, 6]
+     [&w, Z,                    w, i, Ui1, Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%2.d]
+     [?w, Z,                    0, i, Ui1, Upl, UplDnm] ^
+     [&w, vg<SVE_2BHSI:Vesize>, w, i, Ui1, Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%2.d, #%1]
+     [?w, vg<SVE_2BHSI:Vesize>, 0, i, Ui1, Upl, UplDnm] ^
+     [&w, rk,                   w, i, Ui1, Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d]
+     [?w, rk,                   0, i, Ui1, Upl, UplDnm] ^
+     [&w, rk,                   w, i, i,   Upl, UplDnm] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, lsl %p4]
+     [?w, rk,                   0, i, i,   Upl, UplDnm] ^
+  }
   "&& !CONSTANT_P (operands[6])"
   {
     operands[6] = CONSTM1_RTX (VNx2BImode);
@@ -1601,27 +1634,30 @@
 
 ;; Likewise, but with the offset being extended from 32 bits.
 (define_insn_and_rewrite "*aarch64_gather_load_<ANY_EXTEND:optab><SVE_2HSDI:mode><SVE_2BHSI:mode>_<ANY_EXTEND2:su>xtw_unpacked"
-  [(set (match_operand:SVE_2HSDI 0 "register_operand" "=w, w")
+  [(set (match_operand:SVE_2HSDI 0 "register_operand")
 	(unspec:SVE_2HSDI
 	  [(match_operand 6)
 	   (ANY_EXTEND:SVE_2HSDI
 	     (unspec:SVE_2BHSI
-	       [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-		(match_operand:DI 1 "aarch64_reg_or_zero" "rk, rk")
+	       [(match_operand:VNx2BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_reg_or_zero")
 		(unspec:VNx2DI
 		  [(match_operand 7)
 		   (ANY_EXTEND2:VNx2DI
-		     (match_operand:VNx2SI 2 "register_operand" "w, w"))]
+		     (match_operand:VNx2SI 2 "register_operand"))]
 		  UNSPEC_PRED_X)
 		(match_operand:DI 3 "const_int_operand")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_2BHSI:Vesize>" "Ui1, i")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_2BHSI:Vesize>")
 		(mem:BLK (scratch))]
 	       UNSPEC_LD1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE && (~<SVE_2HSDI:narrower_mask> & <SVE_2BHSI:self_mask>) == 0"
-  "@
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, <ANY_EXTEND2:su>xtw]
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, <ANY_EXTEND2:su>xtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, <ANY_EXTEND2:su>xtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, <ANY_EXTEND2:su>xtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
   "&& (!CONSTANT_P (operands[6]) || !CONSTANT_P (operands[7]))"
   {
     operands[6] = CONSTM1_RTX (VNx2BImode);
@@ -1632,28 +1668,31 @@
 ;; Likewise, but with the offset being truncated to 32 bits and then
 ;; sign-extended.
 (define_insn_and_rewrite "*aarch64_gather_load_<ANY_EXTEND:optab><SVE_2HSDI:mode><SVE_2BHSI:mode>_sxtw"
-  [(set (match_operand:SVE_2HSDI 0 "register_operand" "=w, w")
+  [(set (match_operand:SVE_2HSDI 0 "register_operand")
 	(unspec:SVE_2HSDI
 	  [(match_operand 6)
 	   (ANY_EXTEND:SVE_2HSDI
 	     (unspec:SVE_2BHSI
-	       [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-		(match_operand:DI 1 "aarch64_reg_or_zero" "rk, rk")
+	       [(match_operand:VNx2BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_reg_or_zero")
 		(unspec:VNx2DI
 		  [(match_operand 7)
 		   (sign_extend:VNx2DI
 		     (truncate:VNx2SI
-		       (match_operand:VNx2DI 2 "register_operand" "w, w")))]
+		       (match_operand:VNx2DI 2 "register_operand")))]
 		  UNSPEC_PRED_X)
 		(match_operand:DI 3 "const_int_operand")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_2BHSI:Vesize>" "Ui1, i")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_2BHSI:Vesize>")
 		(mem:BLK (scratch))]
 	       UNSPEC_LD1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE && (~<SVE_2HSDI:narrower_mask> & <SVE_2BHSI:self_mask>) == 0"
-  "@
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw]
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
   "&& (!CONSTANT_P (operands[6]) || !CONSTANT_P (operands[7]))"
   {
     operands[6] = CONSTM1_RTX (VNx2BImode);
@@ -1664,25 +1703,28 @@
 ;; Likewise, but with the offset being truncated to 32 bits and then
 ;; zero-extended.
 (define_insn_and_rewrite "*aarch64_gather_load_<ANY_EXTEND:optab><SVE_2HSDI:mode><SVE_2BHSI:mode>_uxtw"
-  [(set (match_operand:SVE_2HSDI 0 "register_operand" "=w, w")
+  [(set (match_operand:SVE_2HSDI 0 "register_operand")
 	(unspec:SVE_2HSDI
 	  [(match_operand 7)
 	   (ANY_EXTEND:SVE_2HSDI
 	     (unspec:SVE_2BHSI
-	       [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-		(match_operand:DI 1 "aarch64_reg_or_zero" "rk, rk")
+	       [(match_operand:VNx2BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_reg_or_zero")
 		(and:VNx2DI
-		  (match_operand:VNx2DI 2 "register_operand" "w, w")
+		  (match_operand:VNx2DI 2 "register_operand")
 		  (match_operand:VNx2DI 6 "aarch64_sve_uxtw_immediate"))
 		(match_operand:DI 3 "const_int_operand")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_2BHSI:Vesize>" "Ui1, i")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<SVE_2BHSI:Vesize>")
 		(mem:BLK (scratch))]
 	       UNSPEC_LD1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE && (~<SVE_2HSDI:narrower_mask> & <SVE_2BHSI:self_mask>) == 0"
-  "@
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw]
-   ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ld1<ANY_EXTEND:s><SVE_2BHSI:Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
   "&& !CONSTANT_P (operands[7])"
   {
     operands[7] = CONSTM1_RTX (VNx2BImode);
@@ -1700,68 +1742,83 @@
 ;; Predicated first-faulting gather loads for 32-bit elements.  Operand
 ;; 3 is true for unsigned extension and false for signed extension.
 (define_insn "@aarch64_ldff1_gather<mode>"
-  [(set (match_operand:SVE_FULL_S 0 "register_operand" "=w, w, w, w, w, w")
+  [(set (match_operand:SVE_FULL_S 0 "register_operand")
 	(unspec:SVE_FULL_S
-	  [(match_operand:VNx4BI 5 "register_operand" "Upl, Upl, Upl, Upl, Upl, Upl")
-	   (match_operand:DI 1 "aarch64_sve_gather_offset_w" "Z, vgw, rk, rk, rk, rk")
-	   (match_operand:VNx4SI 2 "register_operand" "w, w, w, w, w, w")
-	   (match_operand:DI 3 "const_int_operand" "i, i, Z, Ui1, Z, Ui1")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_w" "Ui1, Ui1, Ui1, Ui1, i, i")
+	  [(match_operand:VNx4BI 5 "register_operand")
+	   (match_operand:DI 1 "aarch64_sve_gather_offset_w")
+	   (match_operand:VNx4SI 2 "register_operand")
+	   (match_operand:DI 3 "const_int_operand")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_w")
 	   (mem:BLK (scratch))
 	   (reg:VNx16BI FFRT_REGNUM)]
 	  UNSPEC_LDFF1_GATHER))]
   "TARGET_SVE"
-  "@
-   ldff1w\t%0.s, %5/z, [%2.s]
-   ldff1w\t%0.s, %5/z, [%2.s, #%1]
-   ldff1w\t%0.s, %5/z, [%1, %2.s, sxtw]
-   ldff1w\t%0.s, %5/z, [%1, %2.s, uxtw]
-   ldff1w\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
-   ldff1w\t%0.s, %5/z, [%1, %2.s, uxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5  ]
+     [&w, Z,   w, i,   Ui1, Upl] ldff1w\t%0.s, %5/z, [%2.s]
+     [?w, Z,   0, i,   Ui1, Upl] ^
+     [&w, vgw, w, i,   Ui1, Upl] ldff1w\t%0.s, %5/z, [%2.s, #%1]
+     [?w, vgw, 0, i,   Ui1, Upl] ^
+     [&w, rk,  w, Z,   Ui1, Upl] ldff1w\t%0.s, %5/z, [%1, %2.s, sxtw]
+     [?w, rk,  0, Z,   Ui1, Upl] ^
+     [&w, rk,  w, Ui1, Ui1, Upl] ldff1w\t%0.s, %5/z, [%1, %2.s, uxtw]
+     [?w, rk,  0, Ui1, Ui1, Upl] ^
+     [&w, rk,  w, Z,   i,   Upl] ldff1w\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
+     [?w, rk,  0, Z,   i,   Upl] ^
+     [&w, rk,  w, Ui1, i,   Upl] ldff1w\t%0.s, %5/z, [%1, %2.s, uxtw %p4]
+     [?w, rk,  0, Ui1, i,   Upl] ^
+  }
 )
 
 ;; Predicated first-faulting gather loads for 64-bit elements.  The value
 ;; of operand 3 doesn't matter in this case.
 (define_insn "@aarch64_ldff1_gather<mode>"
-  [(set (match_operand:SVE_FULL_D 0 "register_operand" "=w, w, w, w")
+  [(set (match_operand:SVE_FULL_D 0 "register_operand")
 	(unspec:SVE_FULL_D
-	  [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl, Upl, Upl")
-	   (match_operand:DI 1 "aarch64_sve_gather_offset_d" "Z, vgd, rk, rk")
-	   (match_operand:VNx2DI 2 "register_operand" "w, w, w, w")
+	  [(match_operand:VNx2BI 5 "register_operand")
+	   (match_operand:DI 1 "aarch64_sve_gather_offset_d")
+	   (match_operand:VNx2DI 2 "register_operand")
 	   (match_operand:DI 3 "const_int_operand")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_d" "Ui1, Ui1, Ui1, i")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_d")
 	   (mem:BLK (scratch))
 	   (reg:VNx16BI FFRT_REGNUM)]
 	  UNSPEC_LDFF1_GATHER))]
   "TARGET_SVE"
-  "@
-   ldff1d\t%0.d, %5/z, [%2.d]
-   ldff1d\t%0.d, %5/z, [%2.d, #%1]
-   ldff1d\t%0.d, %5/z, [%1, %2.d]
-   ldff1d\t%0.d, %5/z, [%1, %2.d, lsl %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5 ]
+     [&w, Z,   w, i, Ui1, Upl ] ldff1d\t%0.d, %5/z, [%2.d]
+     [?w, Z,   0, i, Ui1, Upl ] ^
+     [&w, vgd, w, i, Ui1, Upl ] ldff1d\t%0.d, %5/z, [%2.d, #%1]
+     [?w, vgd, 0, i, Ui1, Upl ] ^
+     [&w, rk,  w, i, Ui1, Upl ] ldff1d\t%0.d, %5/z, [%1, %2.d]
+     [?w, rk,  0, i, Ui1, Upl ] ^
+     [&w, rk,  w, i, i,   Upl ] ldff1d\t%0.d, %5/z, [%1, %2.d, lsl %p4]
+     [?w, rk,  0, i, i,   Upl ] ^
+  }
 )
 
 ;; Likewise, but with the offset being sign-extended from 32 bits.
 (define_insn_and_rewrite "*aarch64_ldff1_gather<mode>_sxtw"
-  [(set (match_operand:SVE_FULL_D 0 "register_operand" "=w, w")
+  [(set (match_operand:SVE_FULL_D 0 "register_operand")
 	(unspec:SVE_FULL_D
-	  [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-	   (match_operand:DI 1 "register_operand" "rk, rk")
+	  [(match_operand:VNx2BI 5 "register_operand")
+	   (match_operand:DI 1 "register_operand")
 	   (unspec:VNx2DI
 	     [(match_operand 6)
 	      (sign_extend:VNx2DI
 		(truncate:VNx2SI
-		  (match_operand:VNx2DI 2 "register_operand" "w, w")))]
+		  (match_operand:VNx2DI 2 "register_operand")))]
 	     UNSPEC_PRED_X)
 	   (match_operand:DI 3 "const_int_operand")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_d" "Ui1, i")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_d")
 	   (mem:BLK (scratch))
 	   (reg:VNx16BI FFRT_REGNUM)]
 	  UNSPEC_LDFF1_GATHER))]
   "TARGET_SVE"
-  "@
-   ldff1d\t%0.d, %5/z, [%1, %2.d, sxtw]
-   ldff1d\t%0.d, %5/z, [%1, %2.d, sxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ldff1d\t%0.d, %5/z, [%1, %2.d, sxtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ldff1d\t%0.d, %5/z, [%1, %2.d, sxtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
   "&& !CONSTANT_P (operands[6])"
   {
     operands[6] = CONSTM1_RTX (VNx2BImode);
@@ -1770,22 +1827,25 @@
 
 ;; Likewise, but with the offset being zero-extended from 32 bits.
 (define_insn "*aarch64_ldff1_gather<mode>_uxtw"
-  [(set (match_operand:SVE_FULL_D 0 "register_operand" "=w, w")
+  [(set (match_operand:SVE_FULL_D 0 "register_operand")
 	(unspec:SVE_FULL_D
-	  [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-	   (match_operand:DI 1 "register_operand" "rk, rk")
+	  [(match_operand:VNx2BI 5 "register_operand")
+	   (match_operand:DI 1 "register_operand")
 	   (and:VNx2DI
-	     (match_operand:VNx2DI 2 "register_operand" "w, w")
+	     (match_operand:VNx2DI 2 "register_operand")
 	     (match_operand:VNx2DI 6 "aarch64_sve_uxtw_immediate"))
 	   (match_operand:DI 3 "const_int_operand")
-	   (match_operand:DI 4 "aarch64_gather_scale_operand_d" "Ui1, i")
+	   (match_operand:DI 4 "aarch64_gather_scale_operand_d")
 	   (mem:BLK (scratch))
 	   (reg:VNx16BI FFRT_REGNUM)]
 	  UNSPEC_LDFF1_GATHER))]
   "TARGET_SVE"
-  "@
-   ldff1d\t%0.d, %5/z, [%1, %2.d, uxtw]
-   ldff1d\t%0.d, %5/z, [%1, %2.d, uxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ldff1d\t%0.d, %5/z, [%1, %2.d, uxtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ldff1d\t%0.d, %5/z, [%1, %2.d, uxtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
 )
 
 ;; -------------------------------------------------------------------------
@@ -1803,28 +1863,35 @@
 ;; Predicated extending first-faulting gather loads for 32-bit elements.
 ;; Operand 3 is true for unsigned extension and false for signed extension.
 (define_insn_and_rewrite "@aarch64_ldff1_gather_<ANY_EXTEND:optab><VNx4_WIDE:mode><VNx4_NARROW:mode>"
-  [(set (match_operand:VNx4_WIDE 0 "register_operand" "=w, w, w, w, w, w")
+  [(set (match_operand:VNx4_WIDE 0 "register_operand")
 	(unspec:VNx4_WIDE
-	  [(match_operand:VNx4BI 6 "general_operand" "UplDnm, UplDnm, UplDnm, UplDnm, UplDnm, UplDnm")
+	  [(match_operand:VNx4BI 6 "general_operand")
 	   (ANY_EXTEND:VNx4_WIDE
 	     (unspec:VNx4_NARROW
-	       [(match_operand:VNx4BI 5 "register_operand" "Upl, Upl, Upl, Upl, Upl, Upl")
-		(match_operand:DI 1 "aarch64_sve_gather_offset_<VNx4_NARROW:Vesize>" "Z, vg<VNx4_NARROW:Vesize>, rk, rk, rk, rk")
-		(match_operand:VNx4_WIDE 2 "register_operand" "w, w, w, w, w, w")
-		(match_operand:DI 3 "const_int_operand" "i, i, Z, Ui1, Z, Ui1")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<VNx4_NARROW:Vesize>" "Ui1, Ui1, Ui1, Ui1, i, i")
+	       [(match_operand:VNx4BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_sve_gather_offset_<VNx4_NARROW:Vesize>")
+		(match_operand:VNx4_WIDE 2 "register_operand")
+		(match_operand:DI 3 "const_int_operand")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<VNx4_NARROW:Vesize>")
 		(mem:BLK (scratch))
 		(reg:VNx16BI FFRT_REGNUM)]
 	       UNSPEC_LDFF1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE"
-  "@
-   ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%2.s]
-   ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%2.s, #%1]
-   ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw]
-   ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw]
-   ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
-   ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5, 6]
+     [&w, Z,                      w, i,   Ui1, Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%2.s]
+     [?w, Z,                      0, i,   Ui1, Upl, UplDnm] ^
+     [&w, vg<VNx4_NARROW:Vesize>, w, i,   Ui1, Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%2.s, #%1]
+     [?w, vg<VNx4_NARROW:Vesize>, 0, i,   Ui1, Upl, UplDnm] ^
+     [&w, rk,                     w, Z,   Ui1, Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw]
+     [?w, rk,                     0, Z,   Ui1, Upl, UplDnm] ^
+     [&w, rk,                     w, Ui1, Ui1, Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw]
+     [?w, rk,                     0, Ui1, Ui1, Upl, UplDnm] ^
+     [&w, rk,                     w, Z,   i,   Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
+     [?w, rk,                     0, Z,   i,   Upl, UplDnm] ^
+     [&w, rk,                     w, Ui1, i,   Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx4_NARROW:Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw %p4]
+     [?w, rk,                     0, Ui1, i,   Upl, UplDnm] ^
+  }
   "&& !CONSTANT_P (operands[6])"
   {
     operands[6] = CONSTM1_RTX (VNx4BImode);
@@ -1834,26 +1901,31 @@
 ;; Predicated extending first-faulting gather loads for 64-bit elements.
 ;; The value of operand 3 doesn't matter in this case.
 (define_insn_and_rewrite "@aarch64_ldff1_gather_<ANY_EXTEND:optab><VNx2_WIDE:mode><VNx2_NARROW:mode>"
-  [(set (match_operand:VNx2_WIDE 0 "register_operand" "=w, w, w, w")
+  [(set (match_operand:VNx2_WIDE 0 "register_operand")
 	(unspec:VNx2_WIDE
-	  [(match_operand:VNx2BI 6 "general_operand" "UplDnm, UplDnm, UplDnm, UplDnm")
+	  [(match_operand:VNx2BI 6 "general_operand")
 	   (ANY_EXTEND:VNx2_WIDE
 	     (unspec:VNx2_NARROW
-	       [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl, Upl, Upl")
-		(match_operand:DI 1 "aarch64_sve_gather_offset_<VNx2_NARROW:Vesize>" "Z, vg<VNx2_NARROW:Vesize>, rk, rk")
-		(match_operand:VNx2_WIDE 2 "register_operand" "w, w, w, w")
+	       [(match_operand:VNx2BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_sve_gather_offset_<VNx2_NARROW:Vesize>")
+		(match_operand:VNx2_WIDE 2 "register_operand")
 		(match_operand:DI 3 "const_int_operand")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<VNx2_NARROW:Vesize>" "Ui1, Ui1, Ui1, i")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<VNx2_NARROW:Vesize>")
 		(mem:BLK (scratch))
 		(reg:VNx16BI FFRT_REGNUM)]
 	       UNSPEC_LDFF1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE"
-  "@
-   ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%2.d]
-   ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%2.d, #%1]
-   ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d]
-   ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, lsl %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5, 6]
+     [&w, Z,                      w, i, Ui1, Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%2.d]
+     [?w, Z,                      0, i, Ui1, Upl, UplDnm] ^
+     [&w, vg<VNx2_NARROW:Vesize>, w, i, Ui1, Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%2.d, #%1]
+     [?w, vg<VNx2_NARROW:Vesize>, 0, i, Ui1, Upl, UplDnm] ^
+     [&w, rk,                     w, i, Ui1, Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d]
+     [?w, rk,                     0, i, Ui1, Upl, UplDnm] ^
+     [&w, rk,                     w, i, i,   Upl, UplDnm] ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, lsl %p4]
+     [?w, rk,                     w, i, i,   Upl, UplDnm] ^
+  }
   "&& !CONSTANT_P (operands[6])"
   {
     operands[6] = CONSTM1_RTX (VNx2BImode);
@@ -1862,29 +1934,32 @@
 
 ;; Likewise, but with the offset being sign-extended from 32 bits.
 (define_insn_and_rewrite "*aarch64_ldff1_gather_<ANY_EXTEND:optab><VNx2_WIDE:mode><VNx2_NARROW:mode>_sxtw"
-  [(set (match_operand:VNx2_WIDE 0 "register_operand" "=w, w")
+  [(set (match_operand:VNx2_WIDE 0 "register_operand")
 	(unspec:VNx2_WIDE
 	  [(match_operand 6)
 	   (ANY_EXTEND:VNx2_WIDE
 	     (unspec:VNx2_NARROW
-	       [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-		(match_operand:DI 1 "aarch64_reg_or_zero" "rk, rk")
+	       [(match_operand:VNx2BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_reg_or_zero")
 		(unspec:VNx2DI
 		  [(match_operand 7)
 		   (sign_extend:VNx2DI
 		     (truncate:VNx2SI
-		       (match_operand:VNx2DI 2 "register_operand" "w, w")))]
+		       (match_operand:VNx2DI 2 "register_operand")))]
 		  UNSPEC_PRED_X)
 		(match_operand:DI 3 "const_int_operand")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<VNx2_NARROW:Vesize>" "Ui1, i")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<VNx2_NARROW:Vesize>")
 		(mem:BLK (scratch))
 		(reg:VNx16BI FFRT_REGNUM)]
 	       UNSPEC_LDFF1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE"
-  "@
-   ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw]
-   ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, sxtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
   "&& (!CONSTANT_P (operands[6]) || !CONSTANT_P (operands[7]))"
   {
     operands[6] = CONSTM1_RTX (VNx2BImode);
@@ -1894,26 +1969,29 @@
 
 ;; Likewise, but with the offset being zero-extended from 32 bits.
 (define_insn_and_rewrite "*aarch64_ldff1_gather_<ANY_EXTEND:optab><VNx2_WIDE:mode><VNx2_NARROW:mode>_uxtw"
-  [(set (match_operand:VNx2_WIDE 0 "register_operand" "=w, w")
+  [(set (match_operand:VNx2_WIDE 0 "register_operand")
 	(unspec:VNx2_WIDE
 	  [(match_operand 7)
 	   (ANY_EXTEND:VNx2_WIDE
 	     (unspec:VNx2_NARROW
-	       [(match_operand:VNx2BI 5 "register_operand" "Upl, Upl")
-		(match_operand:DI 1 "aarch64_reg_or_zero" "rk, rk")
+	       [(match_operand:VNx2BI 5 "register_operand")
+		(match_operand:DI 1 "aarch64_reg_or_zero")
 		(and:VNx2DI
-		  (match_operand:VNx2DI 2 "register_operand" "w, w")
+		  (match_operand:VNx2DI 2 "register_operand")
 		  (match_operand:VNx2DI 6 "aarch64_sve_uxtw_immediate"))
 		(match_operand:DI 3 "const_int_operand")
-		(match_operand:DI 4 "aarch64_gather_scale_operand_<VNx2_NARROW:Vesize>" "Ui1, i")
+		(match_operand:DI 4 "aarch64_gather_scale_operand_<VNx2_NARROW:Vesize>")
 		(mem:BLK (scratch))
 		(reg:VNx16BI FFRT_REGNUM)]
 	       UNSPEC_LDFF1_GATHER))]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE"
-  "@
-   ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw]
-   ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw %p4]"
+  {@ [cons: =0, 1, 2, 3, 4, 5]
+     [&w, rk, w, i, Ui1, Upl ] ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw]
+     [?w, rk, 0, i, Ui1, Upl ] ^
+     [&w, rk, w, i, i,   Upl ] ldff1<ANY_EXTEND:s><VNx2_NARROW:Vesize>\t%0.d, %5/z, [%1, %2.d, uxtw %p4]
+     [?w, rk, 0, i, i,   Upl ] ^
+  }
   "&& !CONSTANT_P (operands[7])"
   {
     operands[7] = CONSTM1_RTX (VNx2BImode);
@@ -2533,14 +2611,34 @@
 )
 
 ;; Duplicate an Advanced SIMD vector to fill an SVE vector (LE version).
-(define_insn "@aarch64_vec_duplicate_vq<mode>_le"
-  [(set (match_operand:SVE_FULL 0 "register_operand" "=w")
+
+(define_insn_and_split "@aarch64_vec_duplicate_vq<mode>_le"
+  [(set (match_operand:SVE_FULL 0 "register_operand" "=w, w")
 	(vec_duplicate:SVE_FULL
-	  (match_operand:<V128> 1 "register_operand" "w")))]
+	  (match_operand:<V128> 1 "aarch64_sve_dup_ld1rq_operand" "w, UtQ")))
+   (clobber (match_scratch:VNx16BI 2 "=X, Upl"))]
   "TARGET_SVE && !BYTES_BIG_ENDIAN"
   {
-    operands[1] = gen_rtx_REG (<MODE>mode, REGNO (operands[1]));
-    return "dup\t%0.q, %1.q[0]";
+    switch (which_alternative)
+      {
+	case 0:
+	  operands[1] = gen_rtx_REG (<MODE>mode, REGNO (operands[1]));
+	  return "dup\t%0.q, %1.q[0]";
+	case 1:
+	  return "#";
+	default:
+	  gcc_unreachable ();
+      }
+  }
+  "&& MEM_P (operands[1])"
+  [(const_int 0)]
+  {
+    if (GET_CODE (operands[2]) == SCRATCH)
+      operands[2] = gen_reg_rtx (VNx16BImode);
+    emit_move_insn (operands[2], CONSTM1_RTX (VNx16BImode));
+    rtx gp = gen_lowpart (<VPRED>mode, operands[2]);
+    emit_insn (gen_aarch64_sve_ld1rq<mode> (operands[0], operands[1], gp));
+    DONE;
   }
 )
 
@@ -3637,6 +3735,15 @@
 	  UNSPEC_PRED_X))]
   "TARGET_SVE"
   {
+    /* SVE2 supports the MUL (vectors, unpredicated) form.  Emit the simple
+       pattern for it here rather than splitting off the MULT expander
+       separately.  */
+    if (TARGET_SVE2 && <CODE> == MULT)
+      {
+	emit_move_insn (operands[0], gen_rtx_MULT (<MODE>mode,
+						   operands[1], operands[2]));
+	DONE;
+      }
     operands[3] = aarch64_ptrue_reg (<VPRED>mode);
   }
 )
@@ -3972,7 +4079,7 @@
 ;; -------------------------------------------------------------------------
 
 ;; Unpredicated integer absolute difference.
-(define_expand "<su>abd<mode>_3"
+(define_expand "<su>abd<mode>3"
   [(use (match_operand:SVE_I 0 "register_operand"))
    (USMAX:SVE_I
      (match_operand:SVE_I 1 "register_operand")
@@ -6287,8 +6394,8 @@
 ;; -------------------------------------------------------------------------
 
 ;; Unpredicated fmax/fmin (the libm functions).  The optabs for the
-;; smin/smax rtx codes are handled in the generic section above.
-(define_expand "<maxmin_uns><mode>3"
+;; smax/smin rtx codes are handled in the generic section above.
+(define_expand "<fmaxmin><mode>3"
   [(set (match_operand:SVE_FULL_F 0 "register_operand")
 	(unspec:SVE_FULL_F
 	  [(match_dup 3)
@@ -6300,6 +6407,23 @@
   {
     operands[3] = aarch64_ptrue_reg (<VPRED>mode);
   }
+)
+
+;; Predicated fmax/fmin (the libm functions).  The optabs for the
+;; smax/smin rtx codes are handled in the generic section above.
+(define_expand "cond_<fmaxmin><mode>"
+  [(set (match_operand:SVE_FULL_F 0 "register_operand")
+	(unspec:SVE_FULL_F
+	  [(match_operand:<VPRED> 1 "register_operand")
+	   (unspec:SVE_FULL_F
+	     [(match_dup 1)
+	      (const_int SVE_RELAXED_GP)
+	      (match_operand:SVE_FULL_F 2 "register_operand")
+	      (match_operand:SVE_FULL_F 3 "aarch64_sve_float_maxmin_operand")]
+	     SVE_COND_FP_MAXMIN_PUBLIC)
+	   (match_operand:SVE_FULL_F 4 "aarch64_simd_reg_or_zero")]
+	  UNSPEC_SEL))]
+  "TARGET_SVE"
 )
 
 ;; Predicated floating-point maximum/minimum.
@@ -6918,16 +7042,16 @@
 ;; [SU]ABD	diff.b, p0/m, op1.b, op2.b
 ;; MOVPRFX	op0, op3	// If necessary
 ;; UDOT		op0.s, diff.b, ones.b
-(define_expand "<sur>sad<vsi2qi>"
+(define_expand "<su>sad<vsi2qi>"
   [(use (match_operand:SVE_FULL_SDI 0 "register_operand"))
-   (unspec:<VSI2QI> [(use (match_operand:<VSI2QI> 1 "register_operand"))
-		    (use (match_operand:<VSI2QI> 2 "register_operand"))] ABAL)
+   (USMAX:<VSI2QI> (match_operand:<VSI2QI> 1 "register_operand")
+		   (match_operand:<VSI2QI> 2 "register_operand"))
    (use (match_operand:SVE_FULL_SDI 3 "register_operand"))]
   "TARGET_SVE"
   {
     rtx ones = force_reg (<VSI2QI>mode, CONST1_RTX (<VSI2QI>mode));
     rtx diff = gen_reg_rtx (<VSI2QI>mode);
-    emit_insn (gen_<sur>abd<vsi2qi>_3 (diff, operands[1], operands[2]));
+    emit_insn (gen_<su>abd<vsi2qi>3 (diff, operands[1], operands[2]));
     emit_insn (gen_udot_prod<vsi2qi> (operands[0], diff, ones, operands[3]));
     DONE;
   }
@@ -7261,11 +7385,11 @@
   rtx tmp = gen_reg_rtx (<MODE>mode);
   emit_insn
     (gen_aarch64_pred_fcmla<sve_rot1><mode> (tmp, operands[4],
-					     operands[3], operands[2],
-					     operands[1], operands[5]));
+					     operands[2], operands[1],
+					     operands[3], operands[5]));
   emit_insn
     (gen_aarch64_pred_fcmla<sve_rot2><mode> (operands[0], operands[4],
-					     operands[3], operands[2],
+					     operands[2], operands[1],
 					     tmp, operands[5]));
   DONE;
 })
@@ -7578,7 +7702,7 @@
 (define_insn "*vcond_mask_<mode><vpred>"
   [(set (match_operand:SVE_ALL 0 "register_operand" "=w, w, w, w, ?w, ?&w, ?&w")
 	(unspec:SVE_ALL
-	  [(match_operand:<VPRED> 3 "register_operand" "Upa, Upa, Upa, Upa, Upl, Upl, Upl")
+	  [(match_operand:<VPRED> 3 "register_operand" "Upa, Upa, Upa, Upa, Upl, Upa, Upa")
 	   (match_operand:SVE_ALL 1 "aarch64_sve_reg_or_dup_imm" "w, vss, vss, Ufc, Ufc, vss, Ufc")
 	   (match_operand:SVE_ALL 2 "aarch64_simd_reg_or_zero" "w, 0, Dz, 0, Dz, w, w")]
 	  UNSPEC_SEL))]
@@ -8126,6 +8250,160 @@
 	  UNSPEC_COND_FCMUO))]
 )
 
+;; Similar to *fcm<cmp_op><mode>_and_combine, but for BIC rather than AND.
+;; In this case, we still need a separate NOT/BIC operation, but predicating
+;; the comparison on the BIC operand removes the need for a PTRUE.
+(define_insn_and_split "*fcm<cmp_op><mode>_bic_combine"
+  [(set (match_operand:<VPRED> 0 "register_operand" "=Upa")
+	(and:<VPRED>
+	  (and:<VPRED>
+	    (not:<VPRED>
+	      (unspec:<VPRED>
+	        [(match_operand:<VPRED> 1)
+	         (const_int SVE_KNOWN_PTRUE)
+	         (match_operand:SVE_FULL_F 2 "register_operand" "w")
+	         (match_operand:SVE_FULL_F 3 "aarch64_simd_reg_or_zero" "wDz")]
+	        SVE_COND_FP_CMP_I0))
+	    (match_operand:<VPRED> 4 "register_operand" "Upa"))
+	  (match_dup:<VPRED> 1)))
+   (clobber (match_scratch:<VPRED> 5 "=&Upl"))]
+  "TARGET_SVE"
+  "#"
+  "&& 1"
+  [(set (match_dup 5)
+	(unspec:<VPRED>
+	  [(match_dup 4)
+	   (const_int SVE_MAYBE_NOT_PTRUE)
+	   (match_dup 2)
+	   (match_dup 3)]
+	  SVE_COND_FP_CMP_I0))
+   (set (match_dup 0)
+	(and:<VPRED>
+	  (not:<VPRED>
+	    (match_dup 5))
+	  (match_dup 4)))]
+{
+  if (can_create_pseudo_p ())
+    operands[5] = gen_reg_rtx (<VPRED>mode);
+}
+)
+
+;; Make sure that we expand to a nor when the operand 4 of
+;; *fcm<cmp_op><mode>_bic_combine is a not.
+(define_insn_and_split "*fcm<cmp_op><mode>_nor_combine"
+  [(set (match_operand:<VPRED> 0 "register_operand" "=Upa")
+	(and:<VPRED>
+	  (and:<VPRED>
+	    (not:<VPRED>
+	      (unspec:<VPRED>
+	        [(match_operand:<VPRED> 1)
+	         (const_int SVE_KNOWN_PTRUE)
+	         (match_operand:SVE_FULL_F 2 "register_operand" "w")
+	         (match_operand:SVE_FULL_F 3 "aarch64_simd_reg_or_zero" "wDz")]
+	        SVE_COND_FP_CMP_I0))
+	    (not:<VPRED>
+	      (match_operand:<VPRED> 4 "register_operand" "Upa")))
+	  (match_dup:<VPRED> 1)))
+   (clobber (match_scratch:<VPRED> 5 "=&Upl"))]
+  "TARGET_SVE"
+  "#"
+  "&& 1"
+  [(set (match_dup 5)
+	(unspec:<VPRED>
+	  [(match_dup 1)
+	   (const_int SVE_KNOWN_PTRUE)
+	   (match_dup 2)
+	   (match_dup 3)]
+	  SVE_COND_FP_CMP_I0))
+   (set (match_dup 0)
+	(and:<VPRED>
+	  (and:<VPRED>
+	    (not:<VPRED>
+	      (match_dup 5))
+	    (not:<VPRED>
+	      (match_dup 4)))
+	  (match_dup 1)))]
+{
+  if (can_create_pseudo_p ())
+    operands[5] = gen_reg_rtx (<VPRED>mode);
+}
+)
+
+(define_insn_and_split "*fcmuo<mode>_bic_combine"
+  [(set (match_operand:<VPRED> 0 "register_operand" "=Upa")
+	(and:<VPRED>
+	  (and:<VPRED>
+	    (not:<VPRED>
+	      (unspec:<VPRED>
+	        [(match_operand:<VPRED> 1)
+	         (const_int SVE_KNOWN_PTRUE)
+	         (match_operand:SVE_FULL_F 2 "register_operand" "w")
+	         (match_operand:SVE_FULL_F 3 "register_operand" "w")]
+	        UNSPEC_COND_FCMUO))
+	    (match_operand:<VPRED> 4 "register_operand" "Upa"))
+	  (match_dup:<VPRED> 1)))
+   (clobber (match_scratch:<VPRED> 5 "=&Upl"))]
+  "TARGET_SVE"
+  "#"
+  "&& 1"
+  [(set (match_dup 5)
+	(unspec:<VPRED>
+	  [(match_dup 4)
+	   (const_int SVE_MAYBE_NOT_PTRUE)
+	   (match_dup 2)
+	   (match_dup 3)]
+	  UNSPEC_COND_FCMUO))
+   (set (match_dup 0)
+	(and:<VPRED>
+	  (not:<VPRED>
+	    (match_dup 5))
+	  (match_dup 4)))]
+{
+  if (can_create_pseudo_p ())
+    operands[5] = gen_reg_rtx (<VPRED>mode);
+}
+)
+
+;; Same for unordered comparisons.
+(define_insn_and_split "*fcmuo<mode>_nor_combine"
+  [(set (match_operand:<VPRED> 0 "register_operand" "=Upa")
+	(and:<VPRED>
+	  (and:<VPRED>
+	    (not:<VPRED>
+	      (unspec:<VPRED>
+	        [(match_operand:<VPRED> 1)
+	         (const_int SVE_KNOWN_PTRUE)
+	         (match_operand:SVE_FULL_F 2 "register_operand" "w")
+	         (match_operand:SVE_FULL_F 3 "register_operand" "w")]
+	        UNSPEC_COND_FCMUO))
+	    (not:<VPRED>
+	      (match_operand:<VPRED> 4 "register_operand" "Upa")))
+	  (match_dup:<VPRED> 1)))
+   (clobber (match_scratch:<VPRED> 5 "=&Upl"))]
+  "TARGET_SVE"
+  "#"
+  "&& 1"
+  [(set (match_dup 5)
+	(unspec:<VPRED>
+	  [(match_dup 1)
+	   (const_int SVE_KNOWN_PTRUE)
+	   (match_dup 2)
+	   (match_dup 3)]
+	  UNSPEC_COND_FCMUO))
+   (set (match_dup 0)
+	(and:<VPRED>
+	  (and:<VPRED>
+	    (not:<VPRED>
+	      (match_dup 5))
+	    (not:<VPRED>
+	      (match_dup 4)))
+	  (match_dup 1)))]
+{
+  if (can_create_pseudo_p ())
+    operands[5] = gen_reg_rtx (<VPRED>mode);
+}
+)
+
 ;; -------------------------------------------------------------------------
 ;; ---- [FP] Absolute comparisons
 ;; -------------------------------------------------------------------------
@@ -8392,6 +8670,17 @@
   "TARGET_SVE"
   {
     operands[2] = aarch64_ptrue_reg (<VPRED>mode);
+  }
+)
+
+(define_expand "reduc_<fmaxmin>_scal_<mode>"
+  [(match_operand:<VEL> 0 "register_operand")
+   (unspec:<VEL> [(match_operand:SVE_FULL_F 1 "register_operand")]
+		 FMAXMINNMV)]
+  "TARGET_SVE"
+  {
+    emit_insn (gen_reduc_<optab>_scal_<mode> (operands[0], operands[1]));
+    DONE;
   }
 )
 
@@ -9430,45 +9719,41 @@
 (define_insn "*aarch64_brk<brk_op>_cc"
   [(set (reg:CC_NZC CC_REGNUM)
 	(unspec:CC_NZC
-	  [(match_operand:VNx16BI 1 "register_operand" "Upa, Upa")
+	  [(match_operand:VNx16BI 1 "register_operand" "Upa")
 	   (match_dup 1)
 	   (match_operand:SI 4 "aarch64_sve_ptrue_flag")
 	   (unspec:VNx16BI
 	     [(match_dup 1)
-	      (match_operand:VNx16BI 2 "register_operand" "Upa, Upa")
-	      (match_operand:VNx16BI 3 "aarch64_simd_reg_or_zero" "Dz, 0")]
+	      (match_operand:VNx16BI 2 "register_operand" "Upa")
+	      (match_operand:VNx16BI 3 "aarch64_simd_imm_zero")]
 	     SVE_BRK_UNARY)]
 	  UNSPEC_PTEST))
-   (set (match_operand:VNx16BI 0 "register_operand" "=Upa, Upa")
+   (set (match_operand:VNx16BI 0 "register_operand" "=Upa")
 	(unspec:VNx16BI
 	  [(match_dup 1)
 	   (match_dup 2)
 	   (match_dup 3)]
 	  SVE_BRK_UNARY))]
   "TARGET_SVE"
-  "@
-   brk<brk_op>s\t%0.b, %1/z, %2.b
-   brk<brk_op>s\t%0.b, %1/m, %2.b"
+  "brk<brk_op>s\t%0.b, %1/z, %2.b"
 )
 
 ;; Same, but with only the flags result being interesting.
 (define_insn "*aarch64_brk<brk_op>_ptest"
   [(set (reg:CC_NZC CC_REGNUM)
 	(unspec:CC_NZC
-	  [(match_operand:VNx16BI 1 "register_operand" "Upa, Upa")
+	  [(match_operand:VNx16BI 1 "register_operand" "Upa")
 	   (match_dup 1)
 	   (match_operand:SI 4 "aarch64_sve_ptrue_flag")
 	   (unspec:VNx16BI
 	     [(match_dup 1)
-	      (match_operand:VNx16BI 2 "register_operand" "Upa, Upa")
-	      (match_operand:VNx16BI 3 "aarch64_simd_reg_or_zero" "Dz, 0")]
+	      (match_operand:VNx16BI 2 "register_operand" "Upa")
+	      (match_operand:VNx16BI 3 "aarch64_simd_imm_zero")]
 	     SVE_BRK_UNARY)]
 	  UNSPEC_PTEST))
-   (clobber (match_scratch:VNx16BI 0 "=Upa, Upa"))]
+   (clobber (match_scratch:VNx16BI 0 "=Upa"))]
   "TARGET_SVE"
-  "@
-   brk<brk_op>s\t%0.b, %1/z, %2.b
-   brk<brk_op>s\t%0.b, %1/m, %2.b"
+  "brk<brk_op>s\t%0.b, %1/z, %2.b"
 )
 
 ;; -------------------------------------------------------------------------
@@ -9495,7 +9780,61 @@
   "brk<brk_op>\t%0.b, %1/z, %2.b, %<brk_reg_opno>.b"
 )
 
-;; Same, but also producing a flags result.
+;; BRKN, producing both a predicate and a flags result.  Unlike other
+;; flag-setting instructions, these flags are always set wrt a ptrue.
+(define_insn_and_rewrite "*aarch64_brkn_cc"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand:VNx16BI 4)
+	   (match_operand:VNx16BI 5)
+	   (const_int SVE_KNOWN_PTRUE)
+	   (unspec:VNx16BI
+	     [(match_operand:VNx16BI 1 "register_operand" "Upa")
+	      (match_operand:VNx16BI 2 "register_operand" "Upa")
+	      (match_operand:VNx16BI 3 "register_operand" "0")]
+	     UNSPEC_BRKN)]
+	  UNSPEC_PTEST))
+   (set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(unspec:VNx16BI
+	  [(match_dup 1)
+	   (match_dup 2)
+	   (match_dup 3)]
+	  UNSPEC_BRKN))]
+  "TARGET_SVE"
+  "brkns\t%0.b, %1/z, %2.b, %0.b"
+  "&& (operands[4] != CONST0_RTX (VNx16BImode)
+       || operands[5] != CONST0_RTX (VNx16BImode))"
+  {
+    operands[4] = CONST0_RTX (VNx16BImode);
+    operands[5] = CONST0_RTX (VNx16BImode);
+  }
+)
+
+;; Same, but with only the flags result being interesting.
+(define_insn_and_rewrite "*aarch64_brkn_ptest"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand:VNx16BI 4)
+	   (match_operand:VNx16BI 5)
+	   (const_int SVE_KNOWN_PTRUE)
+	   (unspec:VNx16BI
+	     [(match_operand:VNx16BI 1 "register_operand" "Upa")
+	      (match_operand:VNx16BI 2 "register_operand" "Upa")
+	      (match_operand:VNx16BI 3 "register_operand" "0")]
+	     UNSPEC_BRKN)]
+	  UNSPEC_PTEST))
+   (clobber (match_scratch:VNx16BI 0 "=Upa"))]
+  "TARGET_SVE"
+  "brkns\t%0.b, %1/z, %2.b, %0.b"
+  "&& (operands[4] != CONST0_RTX (VNx16BImode)
+       || operands[5] != CONST0_RTX (VNx16BImode))"
+  {
+    operands[4] = CONST0_RTX (VNx16BImode);
+    operands[5] = CONST0_RTX (VNx16BImode);
+  }
+)
+
+;; BRKPA and BRKPB, producing both a predicate and a flags result.
 (define_insn "*aarch64_brk<brk_op>_cc"
   [(set (reg:CC_NZC CC_REGNUM)
 	(unspec:CC_NZC
@@ -9505,17 +9844,17 @@
 	   (unspec:VNx16BI
 	     [(match_dup 1)
 	      (match_operand:VNx16BI 2 "register_operand" "Upa")
-	      (match_operand:VNx16BI 3 "register_operand" "<brk_reg_con>")]
-	     SVE_BRK_BINARY)]
+	      (match_operand:VNx16BI 3 "register_operand" "Upa")]
+	     SVE_BRKP)]
 	  UNSPEC_PTEST))
    (set (match_operand:VNx16BI 0 "register_operand" "=Upa")
 	(unspec:VNx16BI
 	  [(match_dup 1)
 	   (match_dup 2)
 	   (match_dup 3)]
-	  SVE_BRK_BINARY))]
+	  SVE_BRKP))]
   "TARGET_SVE"
-  "brk<brk_op>s\t%0.b, %1/z, %2.b, %<brk_reg_opno>.b"
+  "brk<brk_op>s\t%0.b, %1/z, %2.b, %3.b"
 )
 
 ;; Same, but with only the flags result being interesting.
@@ -9528,12 +9867,12 @@
 	   (unspec:VNx16BI
 	     [(match_dup 1)
 	      (match_operand:VNx16BI 2 "register_operand" "Upa")
-	      (match_operand:VNx16BI 3 "register_operand" "<brk_reg_con>")]
-	     SVE_BRK_BINARY)]
+	      (match_operand:VNx16BI 3 "register_operand" "Upa")]
+	     SVE_BRKP)]
 	  UNSPEC_PTEST))
    (clobber (match_scratch:VNx16BI 0 "=Upa"))]
   "TARGET_SVE"
-  "brk<brk_op>s\t%0.b, %1/z, %2.b, %<brk_reg_opno>.b"
+  "brk<brk_op>s\t%0.b, %1/z, %2.b, %3.b"
 )
 
 ;; -------------------------------------------------------------------------

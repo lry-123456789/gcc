@@ -1,4 +1,4 @@
-/* Copyright (C) 2016-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2016-2023 Free Software Foundation, Inc.
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -71,42 +71,27 @@ extern unsigned int gcn_local_sym_hash (const char *name);
 #define ASM_APP_ON  ""
 #define ASM_APP_OFF ""
 
-/* Avoid the default in ../../gcc.c, which adds "-pthread", which is not
+/* Avoid the default in ../../gcc.cc, which adds "-pthread", which is not
    supported for gcn.  */
 #define GOMP_SELF_SPECS ""
 
-#ifdef HAVE_GCN_SRAM_ECC_FIJI
-#define A_FIJI
-#else
-#define A_FIJI "!march=*:;march=fiji:;"
-#endif
-#ifdef HAVE_GCN_SRAM_ECC_GFX900
-#define A_900
-#else
-#define A_900 "march=gfx900:;"
-#endif
-#ifdef HAVE_GCN_SRAM_ECC_GFX906
-#define A_906
-#else
-#define A_906 "march=gfx906:;"
-#endif
-#ifdef HAVE_GCN_SRAM_ECC_GFX908
-#define A_908
-#else
-#define A_908 "march=gfx908:;"
-#endif
+#define NO_XNACK "!march=*:;march=fiji:;"
+#define NO_SRAM_ECC "!march=*:;march=fiji:;march=gfx900:;march=gfx906:;"
 
-/* These targets can't have SRAM-ECC, even if a broken assembler allows it.  */
-#define DRIVER_SELF_SPECS \
-  "%{march=fiji|march=gfx900|march=gfx906:%{!msram-ecc=*:-msram-ecc=off}}"
+/* In HSACOv4 no attribute setting means the binary supports "any" hardware
+   configuration.  The name of the attribute also changed.  */
+#define SRAMOPT "msram-ecc=on:-mattr=+sramecc;msram-ecc=off:-mattr=-sramecc"
+
+/* Replace once XNACK is supported:
+   #define XNACKOPT "mxnack=on:-mattr=+xnack;mxnack=off:-mattr=-xnack"  */
+#define XNACKOPT "!mnack=*:-mattr=-xnack;mnack=*:-mattr=-xnack"
 
 /* Use LLVM assembler and linker options.  */
 #define ASM_SPEC  "-triple=amdgcn--amdhsa "  \
 		  "%:last_arg(%{march=*:-mcpu=%*}) " \
-		  "-mattr=%{mxnack:+xnack;:-xnack} " \
-		  /* FIXME: support "any" when we move to HSACOv4.  */ \
-		  "-mattr=%{" A_FIJI A_900 A_906 A_908 \
-			    "!msram-ecc=off:+sram-ecc;:-sram-ecc} " \
+		  "%{!march=*|march=fiji:--amdhsa-code-object-version=3} " \
+		  "%{" NO_XNACK XNACKOPT "}" \
+		  "%{" NO_SRAM_ECC SRAMOPT "} " \
 		  "-filetype=obj"
 #define LINK_SPEC "--pie --export-dynamic"
 #define LIB_SPEC  "-lc"
@@ -132,4 +117,4 @@ extern const char *last_arg_spec_function (int argc, const char **argv);
 #define DWARF2_DEBUGGING_INFO      1
 #define DWARF2_ASM_LINE_DEBUG_INFO 1
 #define EH_FRAME_THROUGH_COLLECT2  1
-#define DBX_REGISTER_NUMBER(REGNO) gcn_dwarf_register_number (REGNO)
+#define DEBUGGER_REGNO(REGNO) gcn_dwarf_register_number (REGNO)

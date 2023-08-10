@@ -1,5 +1,5 @@
 ; Options for the C, ObjC, C++ and ObjC++ front ends.
-; Copyright (C) 2003-2021 Free Software Foundation, Inc.
+; Copyright (C) 2003-2023 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -135,8 +135,8 @@ C ObjC C++ ObjC++ Separate Alias(o)
 -output=
 C ObjC C++ ObjC++ Joined Alias(o)
 
--output-pch=
-C ObjC C++ ObjC++ Joined Separate
+-output-pch
+C ObjC C++ ObjC++ Separate
 
 -pedantic
 C ObjC C++ ObjC++ Alias(pedantic)
@@ -342,13 +342,13 @@ Wno-alloca-larger-than
 C ObjC C++ LTO ObjC++ Alias(Walloca-larger-than=,18446744073709551615EiB,none) Warning
 Disable Walloca-larger-than= warning.  Equivalent to Walloca-larger-than=<SIZE_MAX> or larger.
 
-Warray-bounds
-LangEnabledBy(C ObjC C++ LTO ObjC++)
-; in common.opt
-
 Warray-bounds=
 LangEnabledBy(C ObjC C++ LTO ObjC++,Wall,1,0)
 ; in common.opt
+
+Warray-compare
+C ObjC C++ ObjC++ Var(warn_array_compare) Warning LangEnabledBy(C ObjC C++ ObjC++, Wall)
+Warn about comparisons between two operands of array type.
 
 Warray-parameter
 C ObjC C++ ObjC++ Warning Alias(Warray-parameter=, 2, 0)
@@ -369,6 +369,33 @@ Warn whenever an Objective-C assignment is being intercepted by the garbage coll
 Wbad-function-cast
 C ObjC Var(warn_bad_function_cast) Warning
 Warn about casting functions to incompatible types.
+
+Wbidi-chars
+C ObjC C++ ObjC++ Warning Alias(Wbidi-chars=,any,none)
+;
+
+Wbidi-chars=
+C ObjC C++ ObjC++ RejectNegative Joined Warning CPP(cpp_warn_bidirectional) CppReason(CPP_W_BIDIRECTIONAL) Var(warn_bidirectional) Init(bidirectional_unpaired) Enum(cpp_bidirectional_level) EnumSet
+-Wbidi-chars=[none|unpaired|any|ucn] Warn about UTF-8 bidirectional control characters.
+
+; Required for these enum values.
+SourceInclude
+cpplib.h
+
+Enum
+Name(cpp_bidirectional_level) Type(int) UnknownError(argument %qs to %<-Wbidi-chars%> not recognized)
+
+EnumValue
+Enum(cpp_bidirectional_level) String(none) Value(bidirectional_none) Set(1)
+
+EnumValue
+Enum(cpp_bidirectional_level) String(unpaired) Value(bidirectional_unpaired) Set(1)
+
+EnumValue
+Enum(cpp_bidirectional_level) String(any) Value(bidirectional_any) Set(1)
+
+EnumValue
+Enum(cpp_bidirectional_level) String(ucn) Value(bidirectional_ucn) Set(2)
 
 Wbool-compare
 C ObjC C++ ObjC++ Var(warn_bool_compare) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
@@ -428,27 +455,27 @@ Wc++2a-compat
 C++ ObjC++ Warning Alias(Wc++20-compat) Undocumented
 
 Wc++20-compat
-C++ ObjC++ Var(warn_cxx20_compat) Warning LangEnabledBy(C++ ObjC++,Wall)
+C++ ObjC++ Var(warn_cxx20_compat) Warning LangEnabledBy(C++ ObjC++,Wall) Init(0) CPP(cpp_warn_cxx20_compat) CppReason(CPP_W_CXX20_COMPAT)
 Warn about C++ constructs whose meaning differs between ISO C++ 2017 and ISO C++ 2020.
 
 Wc++11-extensions
-C++ ObjC++ Var(warn_cxx11_extensions) Warning LangEnabledBy(C++ ObjC++) Init(1)
+C++ ObjC++ Var(warn_cxx11_extensions) Warning Init(1)
 Warn about C++11 constructs in code compiled with an older standard.
 
 Wc++14-extensions
-C++ ObjC++ Var(warn_cxx14_extensions) Warning LangEnabledBy(C++ ObjC++) Init(1)
+C++ ObjC++ Var(warn_cxx14_extensions) Warning Init(1)
 Warn about C++14 constructs in code compiled with an older standard.
 
 Wc++17-extensions
-C++ ObjC++ Var(warn_cxx17_extensions) Warning LangEnabledBy(C++ ObjC++) Init(1)
+C++ ObjC++ Var(warn_cxx17_extensions) Warning Init(1)
 Warn about C++17 constructs in code compiled with an older standard.
 
 Wc++20-extensions
-C++ ObjC++ Var(warn_cxx20_extensions) Warning LangEnabledBy(C++ ObjC++) Init(1)
+C++ ObjC++ Var(warn_cxx20_extensions) Warning Init(1)
 Warn about C++20 constructs in code compiled with an older standard.
 
 Wc++23-extensions
-C++ ObjC++ Var(warn_cxx23_extensions) Warning LangEnabledBy(C++ ObjC++) Init(1)
+C++ ObjC++ Var(warn_cxx23_extensions) Warning Init(1)
 Warn about C++23 constructs in code compiled with an older standard.
 
 Wcast-function-type
@@ -466,6 +493,10 @@ Warn about catch handlers of non-reference type.
 Wcatch-value=
 C++ ObjC++ Var(warn_catch_value) Warning Joined RejectNegative UInteger LangEnabledBy(C++ ObjC++,Wall, 1, 0) IntegerRange(0, 3)
 Warn about catch handlers of non-reference type.
+
+Wchanges-meaning
+C++ ObjC++ Var(warn_changes_meaning) Warning Init(1)
+Complain about a name being declared as a class member after a previous use of the same name.
 
 Wchar-subscripts
 C ObjC C++ ObjC++ Var(warn_char_subscripts) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
@@ -519,6 +550,18 @@ Warn when all constructors and destructors are private.
 Wdangling-else
 C ObjC C++ ObjC++ Var(warn_dangling_else) Warning LangEnabledBy(C ObjC C++ ObjC++,Wparentheses)
 Warn about dangling else.
+
+Wdangling-pointer
+C ObjC C++ LTO ObjC++ Alias(Wdangling-pointer=, 2, 0) Warning
+Warn for uses of pointers to auto variables whose lifetime has ended.
+
+Wdangling-pointer=
+C ObjC C++ ObjC++ Joined RejectNegative UInteger Var(warn_dangling_pointer) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall, 2, 0) IntegerRange(0, 2)
+Warn for uses of pointers to auto variables whose lifetime has ended.
+
+Wdangling-reference
+C++ ObjC++ Var(warn_dangling_reference) Warning LangEnabledBy(C++ ObjC++, Wall)
+Warn when a reference is bound to a temporary whose lifetime has ended.
 
 Wdate-time
 C ObjC C++ ObjC++ CPP(warn_date_time) CppReason(CPP_W_DATE_TIME) Var(cpp_warn_date_time) Init(0) Warning
@@ -602,6 +645,10 @@ Warn about comparison of different enum types.
 Wenum-conversion
 C ObjC C++ ObjC++ Var(warn_enum_conversion) Init(0) Warning LangEnabledBy(C ObjC,Wextra)
 Warn about implicit conversion of enum types.
+
+Wenum-int-mismatch
+C ObjC Var(warn_enum_int_mismatch) Warning LangEnabledBy(C ObjC,Wall || Wc++-compat)
+Warn about enum/integer type mismatches.
 
 Werror
 C ObjC C++ ObjC++
@@ -690,6 +737,11 @@ Wformat-truncation=
 C ObjC C++ LTO ObjC++ Joined RejectNegative UInteger Var(warn_format_trunc) Warning LangEnabledBy(C ObjC C++ LTO ObjC++,Wformat=, warn_format >= 1, 0) IntegerRange(0, 2)
 Warn about calls to snprintf and similar functions that truncate output.
 
+Wflex-array-member-not-at-end
+C C++ Var(warn_flex_array_member_not_at_end) Warning
+Warn when a structure containing a C99 flexible array member as the last
+field is not at the end of another structure.
+
 Wif-not-aligned
 C ObjC C++ ObjC++ Var(warn_if_not_aligned) Init(1) Warning
 Warn when the field in a struct is not aligned.
@@ -710,6 +762,10 @@ Wincompatible-pointer-types
 C ObjC Var(warn_incompatible_pointer_types) Init(1) Warning
 Warn when there is a conversion between pointers that have incompatible types.
 
+Winfinite-recursion
+C ObjC C++ LTO ObjC++ Var(warn_infinite_recursion) Warning LangEnabledBy(C ObjC C++ LTO ObjC++, Wall)
+Warn for infinitely recursive calls.
+
 Waddress-of-packed-member
 C ObjC C++ ObjC++ Var(warn_address_of_packed_member) Init(1) Warning
 Warn when the address of packed member of struct or union is taken.
@@ -721,6 +777,11 @@ Warn about variables which are initialized to themselves.
 Winit-list-lifetime
 C++ ObjC++ Var(warn_init_list) Warning Init(1)
 Warn about uses of std::initializer_list that can result in dangling pointers.
+
+Winterference-size
+C++ ObjC++ Var(warn_interference_size) Warning Init(1)
+Warn about nonsensical values of --param destructive-interference-size or
+constructive-interference-size.
 
 Wimplicit
 C ObjC Var(warn_implicit) Warning LangEnabledBy(C ObjC,Wall)
@@ -765,6 +826,10 @@ Wint-to-pointer-cast
 C ObjC C++ ObjC++ Var(warn_int_to_pointer_cast) Init(1) Warning
 Warn when there is a cast to a pointer from an integer of a different size.
 
+Winvalid-constexpr
+C++ ObjC++ Var(warn_invalid_constexpr) Init(-1) Warning
+Warn when a function never produces a constant expression.
+
 Winvalid-offsetof
 C++ ObjC++ Var(warn_invalid_offsetof) Init(1) Warning
 Warn about invalid uses of the \"offsetof\" macro.
@@ -772,6 +837,10 @@ Warn about invalid uses of the \"offsetof\" macro.
 Winvalid-pch
 C ObjC C++ ObjC++ CPP(warn_invalid_pch) CppReason(CPP_W_INVALID_PCH) Var(cpp_warn_invalid_pch) Init(0) Warning
 Warn about PCH files that are found but not used.
+
+Winvalid-utf8
+C ObjC C++ ObjC++ CPP(cpp_warn_invalid_utf8) CppReason(CPP_W_INVALID_UTF8) Var(warn_invalid_utf8) Init(0) Warning
+Warn about invalid UTF-8 characters.
 
 Wjump-misses-init
 C ObjC Var(warn_jump_misses_init) Warning LangEnabledby(C ObjC,Wc++-compat)
@@ -843,6 +912,10 @@ Wmissing-requires
 C++ ObjC++ Var(warn_missing_requires) Init(1) Warning
 Warn about likely missing requires keyword.
 
+Wmissing-template-keyword
+C++ ObjC++ Var(warn_missing_template_keyword) Init(1) Warning
+Warn when the template keyword is missing after a member access token in a dependent member access expression if that member is a template.
+
 Wmultistatement-macros
 C ObjC C++ ObjC++ Var(warn_multistatement_macros) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
 Warn about unsafe macros expanding to multiple statements used as a body of a clause such as if, else, while, switch, or for.
@@ -854,6 +927,10 @@ Warn on direct multiple inheritance.
 Wnamespaces
 C++ ObjC++ Var(warn_namespaces) Warning
 Warn on namespace definition.
+
+Wnrvo
+C++ ObjC++ Var(warn_nrvo)
+Warn if the named return value optimization is not performed although it is allowed.
 
 Wpacked-not-aligned
 C ObjC C++ ObjC++ Var(warn_packed_not_aligned) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
@@ -912,6 +989,11 @@ Wstringop-truncation
 C ObjC C++ LTO ObjC++ Var(warn_stringop_truncation) Warning Init (1) LangEnabledBy(C ObjC C++ LTO ObjC++, Wall)
 Warn about truncation in string manipulation functions like strncat and strncpy.
 
+Wstrict-flex-arrays
+C C++ Var(warn_strict_flex_arrays) Warning
+Warn about inproper usages of flexible array members
+according to the level of -fstrict-flex-arrays.
+
 Wsuggest-attribute=format
 C ObjC C++ ObjC++ Var(warn_suggest_attribute_format) Warning
 Warn about functions which might be candidates for format attributes.
@@ -965,6 +1047,10 @@ Warn about function parameters declared without a type specifier in K&R-style fu
 Wmissing-prototypes
 C ObjC Var(warn_missing_prototypes) Warning
 Warn about global functions without prototypes.
+
+Wmissing-variable-declarations
+C ObjC Var(warn_missing_variable_declarations) Warning
+Warn about global variables without previous declarations.
 
 Wmudflap
 C ObjC C++ ObjC++ WarnRemoved
@@ -1074,7 +1160,11 @@ C ObjC C++ ObjC++ Var(warn_overlength_strings) Warning LangEnabledBy(C ObjC C++ 
 Warn if a string is longer than the maximum portable length specified by the standard.
 
 Woverloaded-virtual
-C++ ObjC++ Var(warn_overloaded_virtual) Warning
+C++ ObjC++ Warning Alias(Woverloaded-virtual=,2,0)
+Warn about overloaded virtual function names.
+
+Woverloaded-virtual=
+C++ ObjC++ Joined UInteger IntegerRange(0,2) Var(warn_overloaded_virtual) Warning LangEnabledBy(C++ ObjC++,Wall,1,0)
 Warn about overloaded virtual function names.
 
 Woverride-init
@@ -1172,6 +1262,10 @@ Warn on suspicious constructs involving reverse scalar storage order.
 Wselector
 ObjC ObjC++ Var(warn_selector) Warning
 Warn if a selector has multiple methods.
+
+Wself-move
+C++ ObjC++ Var(warn_self_move) Warning LangEnabledBy(C++ ObjC++, Wall)
+Warn when a value is moved to itself with std::move.
 
 Wsequence-point
 C ObjC C++ ObjC++ Var(warn_sequence_point) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
@@ -1281,6 +1375,10 @@ Wundef
 C ObjC C++ ObjC++ CPP(warn_undef) CppReason(CPP_W_UNDEF) Var(cpp_warn_undef) Init(0) Warning
 Warn if an undefined macro is used in an #if directive.
 
+Wunicode
+C ObjC C++ ObjC++ CPP(cpp_warn_unicode) CppReason(CPP_W_UNICODE) Var(warn_unicode) Init(1) Warning
+Warn about invalid forms of delimited or named escape sequences.
+
 Wuninitialized
 C ObjC C++ ObjC++ LTO LangEnabledBy(C ObjC C++ ObjC++ LTO,Wall)
 ;
@@ -1324,6 +1422,14 @@ Warn when a const variable is unused.
 Wunused-const-variable=
 C ObjC C++ ObjC++ Joined RejectNegative UInteger Var(warn_unused_const_variable) Warning LangEnabledBy(C ObjC,Wunused-variable, 1, 0) IntegerRange(0, 2)
 Warn when a const variable is unused.
+
+; Defining this option here in addition to common.opt is necessary
+; in order for the default -Wall setting of -Wuse-after-free=2 to take
+; effect.
+
+Wuse-after-free=
+LangEnabledBy(C ObjC C++ LTO ObjC++, Wall,2,0)
+; in common.opt
 
 Wvariadic-macros
 C ObjC C++ ObjC++ CPP(warn_variadic_macros) CppReason(CPP_W_VARIADIC_MACROS) Var(cpp_warn_variadic_macros) Init(0) Warning LangEnabledBy(C ObjC C++ ObjC++,Wpedantic || Wtraditional)
@@ -1375,6 +1481,10 @@ Wwrite-strings
 C ObjC C++ ObjC++ Var(warn_write_strings) Warning
 In C++, nonzero means warn about deprecated conversion from string literals to 'char *'.  In C, similar warning, except that the conversion is of course not deprecated by the ISO C standard.
 
+Wxor-used-as-pow
+C ObjC C++ ObjC++ Var(warn_xor_used_as_pow) Warning Init(1)
+Warn about xor operators where it appears the user meant exponentiation.
+
 Wzero-as-null-pointer-constant
 C++ ObjC++ Var(warn_zero_as_null_pointer_constant) Warning
 Warn when a literal '0' is used as null pointer.
@@ -1386,6 +1496,10 @@ Warn about useless casts.
 Wsubobject-linkage
 C++ ObjC++ Var(warn_subobject_linkage) Warning Init(1)
 Warn if a class type has a base or a field whose type uses the anonymous namespace or depends on a type with no linkage.
+
+Welaborated-enum-base
+C++ ObjC++ Var(warn_elaborated_enum_base) Warning Init(1)
+Warn if an additional enum-base is used in an elaborated-type-specifier.
 
 Wduplicate-decl-specifier
 C ObjC Var(warn_duplicate_decl_specifier) Warning LangEnabledBy(C ObjC,Wall)
@@ -1428,8 +1542,8 @@ fall-virtual
 C++ ObjC++ WarnRemoved
 
 fallow-parameterless-variadic-functions
-C ObjC Var(flag_allow_parameterless_variadic_functions)
-Allow variadic functions without named parameter.
+C ObjC Ignore
+Does nothing. Preserved for backward compatibility.
 
 falt-external-templates
 C++ ObjC++ WarnRemoved
@@ -1578,6 +1692,10 @@ fconstexpr-cache-depth=
 C++ ObjC++ Joined RejectNegative UInteger Var(constexpr_cache_depth) Init(8)
 -fconstexpr-cache-depth=<number>	Specify maximum constexpr recursion cache depth.
 
+fconstexpr-fp-except
+C++ ObjC++ Var(flag_constexpr_fp_except) Init(0)
+Allow IEC559 floating point exceptions in constant expressions.
+
 fconstexpr-loop-limit=
 C++ ObjC++ Joined RejectNegative UInteger Var(constexpr_loop_limit) Init(262144)
 -fconstexpr-loop-limit=<number>	Specify maximum constexpr loop iteration count.
@@ -1585,6 +1703,47 @@ C++ ObjC++ Joined RejectNegative UInteger Var(constexpr_loop_limit) Init(262144)
 fconstexpr-ops-limit=
 C++ ObjC++ Joined RejectNegative Host_Wide_Int Var(constexpr_ops_limit) Init(33554432)
 -fconstexpr-ops-limit=<number>	Specify maximum number of constexpr operations during a single constexpr evaluation.
+
+fcontracts
+C++ ObjC++ Var(flag_contracts) Init(0)
+Enable certain features present in drafts of C++ Contracts.
+
+Enum
+Name(on_off) Type(int) UnknownError(argument %qs must be either %<on%> or %<off%>)
+
+EnumValue
+Enum(on_off) String(off) Value(0)
+
+EnumValue
+Enum(on_off) String(on) Value(1)
+
+fcontract-assumption-mode=
+C++ Joined RejectNegative
+-fcontract-assumption-mode=[on|off]	Enable or disable treating axiom level contracts as assumptions (default on).
+
+fcontract-build-level=
+C++ Joined RejectNegative
+-fcontract-build-level=[off|default|audit]	Specify max contract level to generate runtime checks for.
+
+fcontract-strict-declarations=
+C++ Var(flag_contract_strict_declarations) Enum(on_off) Joined Init(0) RejectNegative
+-fcontract-strict-declarations=[on|off]	Enable or disable warnings on generalized redeclaration of functions with contracts (default off).
+
+fcontract-mode=
+C++ Var(flag_contract_mode) Enum(on_off) Joined Init(1) RejectNegative
+-fcontract-mode=[on|off]	Enable or disable all contract facilities (default on).
+
+fcontract-continuation-mode=
+C++ Joined RejectNegative
+-fcontract-continuation-mode=[on|off]	Enable or disable contract continuation mode (default off).
+
+fcontract-role=
+C++ Joined RejectNegative
+-fcontract-role=<name>:<semantics>	Specify the semantics for all levels in a role (default, review), or a custom contract role with given semantics (ex: opt:assume,assume,assume).
+
+fcontract-semantic=
+C++ Joined RejectNegative
+-fcontract-semantic=<level>:<semantic>	Specify the concrete semantics for level.
 
 fcoroutines
 C++ LTO Var(flag_coroutines)
@@ -1663,6 +1822,10 @@ Support dynamic initialization of thread-local variables in a different translat
 fexternal-templates
 C++ ObjC++ WarnRemoved
 
+ffold-simple-inlines
+C++ ObjC++ Optimization Var(flag_fold_simple_inlines)
+Fold calls to simple inline functions.
+
 ffor-scope
 C++ ObjC++ WarnRemoved
 
@@ -1702,6 +1865,10 @@ No longer supported.
 fimplement-inlines
 C++ ObjC++ Var(flag_implement_inlines) Init(1)
 Export functions even if they can be inlined.
+
+fimplicit-constexpr
+C++ ObjC++ Var(flag_implicit_constexpr)
+Make inline functions constexpr by default.
 
 fimplicit-inline-templates
 C++ ObjC++ Var(flag_implicit_inline_templates) Init(1)
@@ -1984,6 +2151,13 @@ fsized-deallocation
 C++ ObjC++ Var(flag_sized_deallocation) Init(-1)
 Enable C++14 sized deallocation support.
 
+fstrict-flex-arrays
+C C++ Common Alias(fstrict-flex-arrays=,3,0)
+
+fstrict-flex-arrays=
+C C++ Common Joined RejectNegative UInteger Var(flag_strict_flex_arrays) Init(0) IntegerRange(0,3)
+-fstrict-flex-arrays=<level>    Control when to treat the trailing array of a structure as a flexible array member for the purposes of accessing the elements of such an array. The default is treating all trailing arrays of structures as flexible array members.
+
 fsquangle
 C++ ObjC++ WarnRemoved
 
@@ -2238,12 +2412,20 @@ C++ ObjC++
 Conform to the ISO 2020 C++ standard (experimental and incomplete support).
 
 std=c++2b
-C++ ObjC++ Alias(std=c++23)
+C++ ObjC++ Alias(std=c++23) Undocumented
 Conform to the ISO 2023 C++ draft standard (experimental and incomplete support).
 
 std=c++23
-C++ ObjC++ Undocumented
+C++ ObjC++
 Conform to the ISO 2023 C++ draft standard (experimental and incomplete support).
+
+std=c++2c
+C++ ObjC++ Alias(std=c++26)
+Conform to the ISO 2026 C++ draft standard (experimental and incomplete support).
+
+std=c++26
+C++ ObjC++ Undocumented
+Conform to the ISO 2026 C++ draft standard (experimental and incomplete support).
 
 std=c11
 C ObjC
@@ -2324,12 +2506,20 @@ C++ ObjC++
 Conform to the ISO 2020 C++ standard with GNU extensions (experimental and incomplete support).
 
 std=gnu++2b
-C++ ObjC++ Alias(std=gnu++23)
+C++ ObjC++ Alias(std=gnu++23) Undocumented
 Conform to the ISO 2023 C++ draft standard with GNU extensions (experimental and incomplete support).
 
 std=gnu++23
-C++ ObjC++ Undocumented
+C++ ObjC++
 Conform to the ISO 2023 C++ draft standard with GNU extensions (experimental and incomplete support).
+
+std=gnu++2c
+C++ ObjC++ Alias(std=gnu++26)
+Conform to the ISO 2026 C++ draft standard with GNU extensions (experimental and incomplete support).
+
+std=gnu++26
+C++ ObjC++ Undocumented
+Conform to the ISO 2026 C++ draft standard with GNU extensions (experimental and incomplete support).
 
 std=gnu11
 C ObjC

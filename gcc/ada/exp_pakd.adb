@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -493,7 +493,7 @@ package body Exp_Pakd is
 
       Ancest   : Entity_Id;
       PB_Type  : Entity_Id;
-      PASize   : Uint;
+      PASize   : Uint := No_Uint;
       Decl     : Node_Id;
       PAT      : Entity_Id;
       Len_Expr : Node_Id;
@@ -563,19 +563,33 @@ package body Exp_Pakd is
          --  Do not reset RM_Size if already set, as happens in the case of
          --  a modular type.
 
-         if not Known_Esize (PAT) then
-            Set_Esize (PAT, PASize);
+         if Present (PASize) then
+            if not Known_Esize (PAT) then
+               Set_Esize (PAT, PASize);
+            end if;
+
+            if not Known_RM_Size (PAT) then
+               Set_RM_Size (PAT, PASize);
+            end if;
          end if;
 
-         if not Known_RM_Size (PAT) then
-            Set_RM_Size (PAT, PASize);
+         --  In the case of a modular type, make sure the alignment is
+         --  consistent with the Esize.
+
+         if Is_Scalar_Type (PAT) then
+            while Alignment (PAT) * System_Storage_Unit < Esize (PAT)
+              and then Alignment (PAT) < Maximum_Alignment
+            loop
+               Set_Alignment (PAT, 2 * Alignment (PAT));
+            end loop;
          end if;
+
+         --  Then, in all cases, make sure the opposite is also true
 
          Adjust_Esize_Alignment (PAT);
 
          --  Set remaining fields of packed array type
 
-         Init_Alignment                (PAT);
          Set_Parent                    (PAT, Empty);
          Set_Associated_Node_For_Itype (PAT, Typ);
          Set_Original_Array_Type       (PAT, Typ);
@@ -657,11 +671,11 @@ package body Exp_Pakd is
          return;
       end if;
 
-      --  If our immediate ancestor subtype is constrained, and it already
-      --  has a packed array type, then just share the same type, since the
-      --  bounds must be the same. If the ancestor is not an array type but
-      --  a private type, as can happen with multiple instantiations, create
-      --  a new packed type, to avoid privacy issues.
+      --  If our immediate ancestor subtype is constrained, and it already has
+      --  a packed array type, and it has the same size, then just share the
+      --  same type, since the bounds must be the same. If the ancestor is not
+      --  an array type but a private type, as can happen with multiple
+      --  instantiations, create a new packed type, to avoid privacy issues.
 
       if Ekind (Typ) = E_Array_Subtype then
          Ancest := Ancestor_Subtype (Typ);
@@ -670,6 +684,9 @@ package body Exp_Pakd is
            and then Is_Array_Type (Ancest)
            and then Is_Constrained (Ancest)
            and then Present (Packed_Array_Impl_Type (Ancest))
+           and then Known_Esize (Typ)
+           and then Known_Esize (Ancest)
+           and then Esize (Typ) = Esize (Ancest)
          then
             Set_Packed_Array_Impl_Type (Typ, Packed_Array_Impl_Type (Ancest));
             return;
@@ -680,7 +697,9 @@ package body Exp_Pakd is
       --  type, since this size clearly belongs to the packed array type. The
       --  size of the conceptual unpacked type is always set to unknown.
 
-      PASize := RM_Size (Typ);
+      if Known_RM_Size (Typ) then
+         PASize := RM_Size (Typ);
+      end if;
 
       --  Case of an array where at least one index is of an enumeration
       --  type with a non-standard representation, but the component size
@@ -943,7 +962,7 @@ package body Exp_Pakd is
                                    Make_Integer_Literal (Loc, 0),
                                  High_Bound => Lit))));
 
-               if PASize = Uint_0 then
+               if Present (PASize) then
                   PASize := Len_Bits;
                end if;
 
@@ -1914,9 +1933,17 @@ package body Exp_Pakd is
       --  modular case we guarantee that the unused bits are always zeroes.
       --  We do have to compare the lengths because we could be comparing
       --  two different subtypes of the same base type. We can only do this
-      --  if the PATs on both sides are the same.
+      --  if the PATs on both sides are modular (in which case they are
+      --  necessarily structurally the same -- same Modulus and so on);
+      --  otherwise, we have a case where the right operand is not of
+      --  compile time known size.
 
-      if Is_Modular_Integer_Type (PAT) and then PAT = Etype (R) then
+      if Is_Modular_Integer_Type (PAT)
+        and then Is_Modular_Integer_Type (Etype (R))
+      then
+         pragma Assert (RM_Size (Etype (R)) = RM_Size (PAT));
+         pragma Assert (Modulus (Etype (R)) = Modulus (PAT));
+
          Rewrite (N,
            Make_And_Then (Loc,
              Left_Opnd =>
@@ -1973,6 +2000,7 @@ package body Exp_Pakd is
       Rtyp : Entity_Id;
       PAT  : Entity_Id;
       Lit  : Node_Id;
+      Size : Unat;
 
    begin
       Convert_To_Actual_Subtype (Opnd);
@@ -1994,9 +2022,15 @@ package body Exp_Pakd is
 
       --  where PAT is the packed array type, Mask is a mask of all 1 bits of
       --  length equal to the size of this packed type, and Rtyp is the actual
-      --  actual subtype of the operand.
+      --  actual subtype of the operand. Preserve old behavior in case size is
+      --  not set.
 
-      Lit := Make_Integer_Literal (Loc, 2 ** RM_Size (PAT) - 1);
+      if Known_RM_Size (PAT) then
+         Size := RM_Size (PAT);
+      else
+         Size := Uint_0;
+      end if;
+      Lit := Make_Integer_Literal (Loc, 2 ** Size - 1);
       Set_Print_In_Hex (Lit);
 
       if not Is_Array_Type (PAT) then

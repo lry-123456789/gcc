@@ -1,6 +1,6 @@
 // Implementation of std::function -*- C++ -*-
 
-// Copyright (C) 2004-2021 Free Software Foundation, Inc.
+// Copyright (C) 2004-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -36,11 +36,11 @@
 # include <bits/c++0x_warning.h>
 #else
 
-#include <typeinfo>
-#include <bits/stl_function.h>
-#include <bits/invoke.h>
-#include <bits/refwrap.h>
-#include <bits/functexcept.h>
+#include <new>                // placement new
+#include <typeinfo>           // typeid
+#include <bits/invoke.h>      // __invoke_r
+#include <bits/refwrap.h>     // ref wrapper, _Maybe_unary_or_binary_function
+#include <bits/functexcept.h> // __throw_bad_function_call
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -82,17 +82,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   union [[gnu::may_alias]] _Any_data
   {
-    void*       _M_access()       { return &_M_pod_data[0]; }
-    const void* _M_access() const { return &_M_pod_data[0]; }
+    void*       _M_access()       noexcept { return &_M_pod_data[0]; }
+    const void* _M_access() const noexcept { return &_M_pod_data[0]; }
 
     template<typename _Tp>
       _Tp&
-      _M_access()
+      _M_access() noexcept
       { return *static_cast<_Tp*>(_M_access()); }
 
     template<typename _Tp>
       const _Tp&
-      _M_access() const
+      _M_access() const noexcept
       { return *static_cast<const _Tp*>(_M_access()); }
 
     _Nocopy_types _M_unused;
@@ -131,7 +131,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	// Retrieve a pointer to the function object
 	static _Functor*
-	_M_get_pointer(const _Any_data& __source)
+	_M_get_pointer(const _Any_data& __source) noexcept
 	{
 	  if _GLIBCXX17_CONSTEXPR (__stored_locally)
 	    {
@@ -217,22 +217,22 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	template<typename _Signature>
 	  static bool
-	  _M_not_empty_function(const function<_Signature>& __f)
+	  _M_not_empty_function(const function<_Signature>& __f) noexcept
 	  { return static_cast<bool>(__f); }
 
 	template<typename _Tp>
 	  static bool
-	  _M_not_empty_function(_Tp* __fp)
+	  _M_not_empty_function(_Tp* __fp) noexcept
 	  { return __fp != nullptr; }
 
 	template<typename _Class, typename _Tp>
 	  static bool
-	  _M_not_empty_function(_Tp _Class::* __mp)
+	  _M_not_empty_function(_Tp _Class::* __mp) noexcept
 	  { return __mp != nullptr; }
 
 	template<typename _Tp>
 	  static bool
-	  _M_not_empty_function(const _Tp&)
+	  _M_not_empty_function(const _Tp&) noexcept
 	  { return true; }
       };
 
@@ -697,12 +697,31 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     >
     { using type = _Res(_Args...); };
 
+#if __cpp_static_call_operator >= 202207L && __cpp_concepts >= 202002L
+  template<typename _StaticCallOp>
+    struct __function_guide_static_helper
+    { };
+
+  template<typename _Res, bool _Nx, typename... _Args>
+    struct __function_guide_static_helper<_Res (*) (_Args...) noexcept(_Nx)>
+    { using type = _Res(_Args...); };
+
+  template<typename _Fn, typename _Op>
+    using __function_guide_t = typename __conditional_t<
+      requires (_Fn& __f) { (void) __f.operator(); },
+      __function_guide_static_helper<_Op>,
+      __function_guide_helper<_Op>>::type;
+#else
+  template<typename _Fn, typename _Op>
+    using __function_guide_t = typename __function_guide_helper<_Op>::type;
+#endif
+
   template<typename _Res, typename... _ArgTypes>
     function(_Res(*)(_ArgTypes...)) -> function<_Res(_ArgTypes...)>;
 
-  template<typename _Functor, typename _Signature = typename
-	   __function_guide_helper<decltype(&_Functor::operator())>::type>
-    function(_Functor) -> function<_Signature>;
+  template<typename _Fn, typename _Signature
+	     = __function_guide_t<_Fn, decltype(&_Fn::operator())>>
+    function(_Fn) -> function<_Signature>;
 #endif
 
   // [20.7.15.2.6] null pointer comparisons

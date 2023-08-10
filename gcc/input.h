@@ -1,6 +1,6 @@
 /* Declarations for variables relating to reading the source file.
    Used by parsers, lexical analyzers, and error message routines.
-   Copyright (C) 1993-2021 Free Software Foundation, Inc.
+   Copyright (C) 1993-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -32,15 +32,43 @@ extern GTY(()) class line_maps *saved_line_table;
 /* The location for declarations in "<built-in>" */
 #define BUILTINS_LOCATION ((location_t) 1)
 
-/* line-map.c reserves RESERVED_LOCATION_COUNT to the user.  Ensure
+/* Returns the translated string referring to the special location.  */
+const char *special_fname_builtin ();
+
+/* line-map.cc reserves RESERVED_LOCATION_COUNT to the user.  Ensure
    both UNKNOWN_LOCATION and BUILTINS_LOCATION fit into that.  */
 STATIC_ASSERT (BUILTINS_LOCATION < RESERVED_LOCATION_COUNT);
+
+/* Hasher for 'location_t' values satisfying '!RESERVED_LOCATION_P', thus able
+   to use 'UNKNOWN_LOCATION'/'BUILTINS_LOCATION' as spare values for
+   'Empty'/'Deleted'.  */
+/* Per PR103157 "'gengtype': 'typedef' causing infinite-recursion code to be
+   generated", don't use
+       typedef int_hash<location_t, UNKNOWN_LOCATION, BUILTINS_LOCATION>
+         location_hash;
+   here.
+
+   It works for a single-use case, but when using a 'struct'-based variant
+       struct location_hash
+         : int_hash<location_t, UNKNOWN_LOCATION, BUILTINS_LOCATION> {};
+   in more than one place, 'gengtype' generates duplicate functions (thus:
+   "error: redefinition of 'void gt_ggc_mx(location_hash&)'" etc.).
+   Attempting to mark that one up with GTY options, we run into a 'gengtype'
+   "parse error: expected '{', have '<'", which probably falls into category
+   "understanding of C++ is limited", as documented in 'gcc/doc/gty.texi'.
+
+   Thus, use a plain ol' '#define':
+*/
+#define location_hash int_hash<location_t, UNKNOWN_LOCATION, BUILTINS_LOCATION>
 
 extern bool is_location_from_builtin_token (location_t);
 extern expanded_location expand_location (location_t);
 
-extern int location_compute_display_column (expanded_location exploc,
-					    int tabstop);
+class cpp_char_column_policy;
+
+extern int
+location_compute_display_column (expanded_location exploc,
+				 const cpp_char_column_policy &policy);
 
 /* A class capturing the bounds of a buffer, to allow for run-time
    bounds-checking in a checked build.  */
@@ -86,6 +114,8 @@ class char_span
 };
 
 extern char_span location_get_source_line (const char *file_path, int line);
+extern char *get_source_text_between (location_t, location_t);
+extern char_span get_source_file_content (const char *file_path);
 
 extern bool location_missing_trailing_newline (const char *file_path);
 
@@ -140,6 +170,10 @@ extern location_t expansion_point_location (location_t);
 
 extern location_t input_location;
 
+extern location_t location_with_discriminator (location_t, int);
+extern bool has_discriminator (location_t);
+extern int get_discriminator_from_loc (location_t);
+
 #define LOCATION_FILE(LOC) ((expand_location (LOC)).file)
 #define LOCATION_LINE(LOC) ((expand_location (LOC)).line)
 #define LOCATION_COLUMN(LOC)((expand_location (LOC)).column)
@@ -162,7 +196,7 @@ extern location_t input_location;
    that is part of a macro replacement-list defined in a system
    header, but expanded in a non-system file.  */
 
-static inline int
+inline int
 in_system_header_at (location_t loc)
 {
   return linemap_location_in_system_header_p (line_table, loc);
@@ -171,7 +205,7 @@ in_system_header_at (location_t loc)
 /* Return true if LOCATION is the locus of a token that
    comes from a macro expansion, false otherwise.  */
 
-static inline bool
+inline bool
 from_macro_expansion_at (location_t loc)
 {
   return linemap_location_from_macro_expansion_p (line_table, loc);
@@ -181,13 +215,13 @@ from_macro_expansion_at (location_t loc)
    a macro definition, false otherwise.  This differs from from_macro_expansion_at
    in its treatment of macro arguments, for which this returns false.  */
 
-static inline bool
+inline bool
 from_macro_definition_at (location_t loc)
 {
   return linemap_location_from_macro_definition_p (line_table, loc);
 }
 
-static inline location_t
+inline location_t
 get_pure_location (location_t loc)
 {
   return get_pure_location (line_table, loc);
@@ -195,7 +229,7 @@ get_pure_location (location_t loc)
 
 /* Get the start of any range encoded within location LOC.  */
 
-static inline location_t
+inline location_t
 get_start (location_t loc)
 {
   return get_range_from_loc (line_table, loc).m_start;
@@ -203,7 +237,7 @@ get_start (location_t loc)
 
 /* Get the endpoint of any range encoded within location LOC.  */
 
-static inline location_t
+inline location_t
 get_finish (location_t loc)
 {
   return get_range_from_loc (line_table, loc).m_finish;
@@ -230,8 +264,6 @@ public:
   location_t * GTY ((atomic)) m_locs;
 };
 
-struct location_hash : int_hash <location_t, UNKNOWN_LOCATION> { };
-
 class GTY(()) string_concat_db
 {
  public:
@@ -246,7 +278,7 @@ class GTY(()) string_concat_db
   static location_t get_key_loc (location_t loc);
 
   /* For the fields to be private, we must grant access to the
-     generated code in gtype-desc.c.  */
+     generated code in gtype-desc.cc.  */
 
   friend void ::gt_ggc_mx_string_concat_db (void *x_p);
   friend void ::gt_pch_nx_string_concat_db (void *x_p);

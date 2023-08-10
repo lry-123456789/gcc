@@ -1,5 +1,5 @@
 /* Register note definitions.
-   Copyright (C) 2004-2021 Free Software Foundation, Inc.
+   Copyright (C) 2004-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -157,6 +157,11 @@ REG_CFA_NOTE (CFA_VAL_EXPRESSION)
    first pattern is the register to be restored.  */
 REG_CFA_NOTE (CFA_RESTORE)
 
+/* Like CFA_RESTORE but without actually emitting CFI.  This can be
+   used to tell the verification infrastructure that a register is
+   saved without intending to restore it.  */
+REG_CFA_NOTE (CFA_NO_RESTORE)
+
 /* Attached to insns that are RTX_FRAME_RELATED_P, marks insn that sets
    vDRAP from DRAP.  If vDRAP is a register, vdrap_reg is initalized
    to the argument, if it is a MEM, it is ignored.  */
@@ -209,7 +214,7 @@ REG_NOTE (TM)
    ACCUMULATE_OUTGOING_ARGS is false.  */
 REG_NOTE (ARGS_SIZE)
 
-/* Used for communication between IRA and caller-save.c, indicates
+/* Used for communication between IRA and caller-save.cc, indicates
    that the return value of a call can be used to reinitialize a
    pseudo reg.  */
 REG_NOTE (RETURNED)

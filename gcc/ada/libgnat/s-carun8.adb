@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2002-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2002-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -28,8 +28,6 @@
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
 --                                                                          --
 ------------------------------------------------------------------------------
-
-pragma Compiler_Unit_Warning;
 
 with System.Address_Operations; use System.Address_Operations;
 
@@ -59,6 +57,9 @@ package body System.Compare_Array_Unsigned_8 is
    function To_Big_Bytes is new
      Ada.Unchecked_Conversion (System.Address, Big_Bytes_Ptr);
 
+   pragma Annotate (Gnatcheck, Exempt_On, "Improper_Returns",
+                    "early returns for performance");
+
    ----------------------
    -- Compare_Array_U8 --
    ----------------------
@@ -74,7 +75,7 @@ package body System.Compare_Array_Unsigned_8 is
    begin
       --  If operands are non-aligned, or length is too short, go by bytes
 
-      if (ModA (OrA (Left, Right), 4) /= 0) or else Compare_Len < 4 then
+      if ModA (OrA (Left, Right), 4) /= 0 or else Compare_Len < 4 then
          return Compare_Array_U8_Unaligned (Left, Right, Left_Len, Right_Len);
       end if;
 
@@ -148,4 +149,5 @@ package body System.Compare_Array_Unsigned_8 is
       end if;
    end Compare_Array_U8_Unaligned;
 
+   pragma Annotate (Gnatcheck, Exempt_Off, "Improper_Returns");
 end System.Compare_Array_Unsigned_8;

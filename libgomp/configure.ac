@@ -121,15 +121,17 @@ AC_SUBST(CFLAGS)
 # in both places for now and restore CFLAGS at the end of config.
 save_CFLAGS="$CFLAGS"
 
+AC_ARG_ENABLE([werror],
+  [AS_HELP_STRING([--disable-werror], [disable building with -Werror])])
 # Add -Wall -Werror if we are using GCC.
-if test "x$GCC" = "xyes"; then
-  XCFLAGS="$XCFLAGS -Wall -Werror"
-fi
+AS_IF([test "x$GCC" = "xyes"],
+  [XCFLAGS="$XCFLAGS -Wall"])
+AS_IF([test "x$enable_werror" != "xno" && test "x$GCC" = "xyes"],
+  [XCFLAGS="$XCFLAGS -Werror"])
 
 # Find other programs we need.
 AC_CHECK_TOOL(AR, ar)
 AC_CHECK_TOOL(RANLIB, ranlib, ranlib-not-found-in-path-error)
-AC_PATH_PROG(PERL, perl, perl-not-found-in-path-error)
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 
@@ -149,11 +151,22 @@ AC_SUBST(enable_static)
 
 AM_MAINTAINER_MODE
 
+# We optionally test libgomp C++ support, and for that want to use the proper
+# C++ driver, 'g++' (or 'xg++' for build-tree testing).  Given that build of
+# target libstdc++-v3 depends on target libgomp (see '../Makefile.def'), we
+# cannot make build of target libgomp depend on target libstdc++-v3: circular
+# dependency.  We thus cannot instantiate 'AC_PROG_CXX' here: we'd get
+# '-funconfigured-libstdc++-v3' (see '../configure.ac').  Therefore, just
+# capture 'CXX', and we'll fix this up at 'make check' time (see
+# 'testsuite/lib/libgomp.exp:libgomp_init').
+AC_SUBST(CXX)
+
 # Create a spec file, so that compile/link tests don't fail
 test -f libgfortran.spec || touch libgfortran.spec
 FCFLAGS="$FCFLAGS -L."
 
-# We need gfortran to compile parts of the library
+# We need 'gfortran' to compile parts of the library, and test libgomp Fortran
+# support.
 # We can't use AC_PROG_FC because it expects a fully working gfortran.
 #AC_PROG_FC(gfortran)
 case `echo $GFORTRAN` in
@@ -336,6 +349,13 @@ fi
 AX_COUNT_CPUS
 AC_SUBST(CPU_COUNT)
 
+AC_MSG_NOTICE([checking for flock implementation])
+AC_CHECK_PROGS(FLOCK, flock)
+# Fallback if 'perl' is available.
+if test -z "$FLOCK"; then
+  AC_CHECK_PROG(FLOCK, perl, $srcdir/testsuite/flock)
+fi
+
 # Get target configury.
 . ${srcdir}/configure.tgt
 CFLAGS="$save_CFLAGS $XCFLAGS"
@@ -382,9 +402,9 @@ fi
 # which will force linkage against -lpthread (or equivalent for the system).
 # That's not 100% ideal, but about the best we can do easily.
 if test $enable_shared = yes; then
-  link_gomp="-lgomp %{static: $LIBS}"
+  link_gomp="-lgomp %{static: $LIBS${DL_LIBS:+ $DL_LIBS}}"
 else
-  link_gomp="-lgomp $LIBS"
+  link_gomp="-lgomp $LIBS${DL_LIBS:+ $DL_LIBS}"
 fi
 AC_SUBST(link_gomp)
 
@@ -438,13 +458,15 @@ fi
 if test $OMP_NEST_LOCK_25_SIZE -gt 8 || test $OMP_NEST_LOCK_25_ALIGN -gt $OMP_NEST_LOCK_25_SIZE; then
   OMP_NEST_LOCK_25_KIND=8
 fi
-if test $OMP_DEPEND_KIND -eq 16; then
-  if test $OMP_INT128_SIZE -ne 16; then
-    AC_MSG_ERROR([unsupported system, cannot find Fortran int kind=16, needed for omp_depend_kind])
-  fi
-else
-  if test $OMP_DEPEND_KIND -ne 8; then
-    AC_MSG_ERROR([unsupported system, cannot find Fortran integer kind for omp_depend_kind])
+if test "$ac_cv_fc_compiler_gnu" = yes; then
+  if test $OMP_DEPEND_KIND -eq 16; then
+    if test $OMP_INT128_SIZE -ne 16; then
+      AC_MSG_ERROR([unsupported system, cannot find Fortran int kind=16, needed for omp_depend_kind])
+    fi
+  else
+    if test $OMP_DEPEND_KIND -ne 8; then
+      AC_MSG_ERROR([unsupported system, cannot find Fortran integer kind for omp_depend_kind])
+    fi
   fi
 fi
 

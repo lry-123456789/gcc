@@ -1,5 +1,5 @@
 // Implementation of access-related functions for RTL SSA           -*- C++ -*-
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -394,6 +394,28 @@ set_node::print (pretty_printer *pp) const
 }
 
 // See the comment above the declaration.
+clobber_info *
+clobber_group::prev_clobber (insn_info *insn) const
+{
+  auto &tree = const_cast<clobber_tree &> (m_clobber_tree);
+  int comparison = lookup_clobber (tree, insn);
+  if (comparison <= 0)
+    return dyn_cast<clobber_info *> (tree.root ()->prev_def ());
+  return tree.root ();
+}
+
+// See the comment above the declaration.
+clobber_info *
+clobber_group::next_clobber (insn_info *insn) const
+{
+  auto &tree = const_cast<clobber_tree &> (m_clobber_tree);
+  int comparison = lookup_clobber (tree, insn);
+  if (comparison >= 0)
+    return dyn_cast<clobber_info *> (tree.root ()->next_def ());
+  return tree.root ();
+}
+
+// See the comment above the declaration.
 void
 clobber_group::print (pretty_printer *pp) const
 {
@@ -413,6 +435,32 @@ clobber_group::print (pretty_printer *pp) const
   pp_newline_and_indent (pp, 2);
   m_clobber_tree.print (pp, print_clobber);
   pp_indentation (pp) -= 4;
+}
+
+// See the comment above the declaration.
+def_info *
+def_lookup::prev_def (insn_info *insn) const
+{
+  if (mux && comparison == 0)
+    if (auto *node = mux.dyn_cast<def_node *> ())
+      if (auto *group = dyn_cast<clobber_group *> (node))
+	if (clobber_info *clobber = group->prev_clobber (insn))
+	  return clobber;
+
+  return last_def_of_prev_group ();
+}
+
+// See the comment above the declaration.
+def_info *
+def_lookup::next_def (insn_info *insn) const
+{
+  if (mux && comparison == 0)
+    if (auto *node = mux.dyn_cast<def_node *> ())
+      if (auto *group = dyn_cast<clobber_group *> (node))
+	if (clobber_info *clobber = group->next_clobber (insn))
+	  return clobber;
+
+  return first_def_of_next_group ();
 }
 
 // Return a clobber_group for CLOBBER, creating one if CLOBBER doesn't
@@ -746,23 +794,26 @@ function_info::merge_clobber_groups (clobber_info *clobber1,
 // GROUP spans INSN, and INSN now sets the resource that GROUP clobbers.
 // Split GROUP around INSN and return the clobber that comes immediately
 // before INSN.
+//
+// The resource that GROUP clobbers is known to have an associated
+// splay tree.
 clobber_info *
 function_info::split_clobber_group (clobber_group *group, insn_info *insn)
 {
   // Search for either the previous or next clobber in the group.
   // The result is less than zero if CLOBBER should come before NEIGHBOR
   // or greater than zero if CLOBBER should come after NEIGHBOR.
-  int comparison = lookup_clobber (group->m_clobber_tree, insn);
+  clobber_tree &tree1 = group->m_clobber_tree;
+  int comparison = lookup_clobber (tree1, insn);
   gcc_checking_assert (comparison != 0);
-  clobber_info *neighbor = group->m_clobber_tree.root ();
+  clobber_info *neighbor = tree1.root ();
 
-  clobber_tree tree1, tree2;
+  clobber_tree tree2;
   clobber_info *prev;
   clobber_info *next;
   if (comparison > 0)
     {
       // NEIGHBOR is the last clobber in what will become the first group.
-      tree1 = neighbor;
       tree2 = tree1.split_after_root ();
       prev = neighbor;
       next = as_a<clobber_info *> (prev->next_def ());
@@ -794,6 +845,9 @@ function_info::split_clobber_group (clobber_group *group, insn_info *insn)
   next->set_group (group2);
   tree2->set_group (group2);
   last_clobber->set_group (group2);
+
+  // Insert GROUP2 into the splay tree as an immediate successor of GROUP1.
+  def_splay_tree::insert_child (group1, 1, group2);
 
   return prev;
 }
@@ -1299,9 +1353,9 @@ function_info::make_use_available (use_info *use, bb_info *bb,
 	  input->m_is_temp = true;
 	  phi->m_is_temp = true;
 	  phi->make_degenerate (input);
-	  if (def_info *prev = dl.prev_def ())
+	  if (def_info *prev = dl.prev_def (phi_insn))
 	    phi->set_prev_def (prev);
-	  if (def_info *next = dl.next_def ())
+	  if (def_info *next = dl.next_def (phi_insn))
 	    phi->set_next_def (next);
 	}
 

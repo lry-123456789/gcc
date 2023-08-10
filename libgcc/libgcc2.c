@@ -1,6 +1,6 @@
 /* More subroutines needed by GCC output code on some machines.  */
 /* Compile this one with gcc.  */
-/* Copyright (C) 1989-2021 Free Software Foundation, Inc.
+/* Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1904,10 +1904,17 @@ NAME (TYPE x, int m)
 # define MODE	tc
 # define CEXT	__LIBGCC_TF_FUNC_EXT__
 # define NOTRUNC (!__LIBGCC_TF_EXCESS_PRECISION__)
-# define RBIG	(__LIBGCC_TF_MAX__ / 2)
-# define RMIN	(__LIBGCC_TF_MIN__)
-# define RMIN2	(__LIBGCC_TF_EPSILON__)
-# define RMINSCAL (1 / __LIBGCC_TF_EPSILON__)
+# if __LIBGCC_TF_MANT_DIG__ == 106
+#  define RBIG	(__LIBGCC_DF_MAX__ / 2)
+#  define RMIN	(__LIBGCC_DF_MIN__)
+#  define RMIN2  (__LIBGCC_DF_EPSILON__)
+#  define RMINSCAL (1 / __LIBGCC_DF_EPSILON__)
+# else
+#  define RBIG	(__LIBGCC_TF_MAX__ / 2)
+#  define RMIN	(__LIBGCC_TF_MIN__)
+#  define RMIN2	(__LIBGCC_TF_EPSILON__)
+#  define RMINSCAL (1 / __LIBGCC_TF_EPSILON__)
+# endif
 # define RMAX2	(RBIG * RMIN2)
 #else
 # error
@@ -2266,6 +2273,7 @@ __clear_cache (void *beg __attribute__((__unused__)),
 /* Jump to a trampoline, loading the static chain address.  */
 
 #if defined(WINNT) && ! defined(__CYGWIN__)
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 int getpagesize (void);
 int mprotect (char *,int, int);

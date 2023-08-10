@@ -1,6 +1,6 @@
 ## Makefile for the doc subdirectory of the GNU C++ Standard library.
 ##
-## Copyright (C) 2008-2021 Free Software Foundation, Inc.
+## Copyright (C) 2008-2023 Free Software Foundation, Inc.
 ##
 ## This file is part of the libstdc++ version 3 distribution.
 ## Process this file with automake to produce Makefile.in.
@@ -23,6 +23,8 @@
 include $(top_srcdir)/fragment.am
 
 # Documentation Overview
+#
+# See ./xml/manual/documentation_hacking.xml for full details.
 #
 # There are two main input materials for libstdc++ documentation.
 # The first is the doxygen markup in libstdc++ sources, which is a
@@ -226,10 +228,11 @@ ${doxygen_outdir}/man:
 	mkdir -p ${doxygen_outdir}/man
 
 stamp-xml-doxygen: ${doxygen_outdir}/xml
-	@builddir=`cd ..; ${PWD_COMMAND}`; \
+	-srcdir=`cd ${top_srcdir}; ${PWD_COMMAND}`; \
+	  builddir=`cd ..; ${PWD_COMMAND}`; \
 	  ${SHELL} ${doxygen_script} \
 	  --host_alias=${host_alias} --mode=xml \
-	  "${top_srcdir}" "$${builddir}" NO || true
+	  "$${srcdir}" "$${builddir}" NO
 	$(STAMP) stamp-xml-doxygen
 
 stamp-xml-single-doxygen: stamp-xml-doxygen
@@ -239,17 +242,19 @@ stamp-xml-single-doxygen: stamp-xml-doxygen
 	$(STAMP) stamp-xml-single-doxygen
 
 stamp-html-doxygen: ${doxygen_outdir}/html
-	@builddir=`cd ..; ${PWD_COMMAND}`; \
+	-srcdir=`cd ${top_srcdir}; ${PWD_COMMAND}`; \
+	  builddir=`cd ..; ${PWD_COMMAND}`; \
 	  ${SHELL} ${doxygen_script} \
 	  --host_alias=${host_alias} --mode=html \
-	  "${top_srcdir}" "$${builddir}" YES || true
+	  "$${srcdir}" "$${builddir}" YES
 	$(STAMP) stamp-html-doxygen
 
 stamp-latex-doxygen: ${doxygen_outdir}/latex
-	@builddir=`cd ..; ${PWD_COMMAND}`; \
+	-srcdir=`cd ${top_srcdir}; ${PWD_COMMAND}`; \
+	  builddir=`cd ..; ${PWD_COMMAND}`; \
 	  ${SHELL} ${doxygen_script} \
 	  --host_alias=${host_alias} --mode=latex --latex_cmd=$(LATEX_CMD) \
-	  "${top_srcdir}" "$${builddir}" NO || true
+	  "$${srcdir}" "$${builddir}" NO
 	$(STAMP) stamp-latex-doxygen
 
 # Chance of loooooonnggg creation time on this rule.  Iff this fails,
@@ -274,10 +279,11 @@ stamp-pdf-doxygen: stamp-latex-doxygen ${doxygen_outdir}/pdf
 	$(STAMP) stamp-pdf-doxygen
 
 stamp-man-doxygen: ${doxygen_outdir}/man
-	@builddir=`cd ..; ${PWD_COMMAND}`; \
+	-srcdir=`cd ${top_srcdir}; ${PWD_COMMAND}`; \
+	  builddir=`cd ..; ${PWD_COMMAND}`; \
 	  ${SHELL} ${doxygen_script} \
 	  --host_alias=${host_alias} --mode=man \
-	  "${top_srcdir}" "$${builddir}" YES || true
+	  "$${srcdir}" "$${builddir}" YES
 	$(STAMP) stamp-man-doxygen
 
 doc-xml-doxygen: stamp-xml-doxygen

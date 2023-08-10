@@ -1,5 +1,5 @@
 /* GCC core type declarations.
-   Copyright (C) 2002-2021 Free Software Foundation, Inc.
+   Copyright (C) 2002-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -99,6 +99,7 @@ typedef const union tree_node *const_tree;
 struct gimple;
 typedef gimple *gimple_seq;
 struct gimple_stmt_iterator;
+class code_helper;
 
 /* Forward decls for leaf gimple subclasses (for individual gimple codes).
    Keep this in the same order as the corresponding codes in gimple.def.  */
@@ -228,15 +229,17 @@ enum stack_protector {
   SPCT_FLAG_EXPLICIT = 4
 };
 
-/* Types of unwind/exception handling info that can be generated.  */
+/* Types of unwind/exception handling info that can be generated.
+   Note that a UI_TARGET (or larger) setting is considered to be
+   incompatible with -freorder-blocks-and-partition.  */
 
 enum unwind_info_type
 {
   UI_NONE,
   UI_SJLJ,
   UI_DWARF2,
-  UI_TARGET,
-  UI_SEH
+  UI_SEH,
+  UI_TARGET
 };
 
 /* Callgraph node profile representation.  */
@@ -425,7 +428,8 @@ enum excess_precision_type
 {
   EXCESS_PRECISION_TYPE_IMPLICIT,
   EXCESS_PRECISION_TYPE_STANDARD,
-  EXCESS_PRECISION_TYPE_FAST
+  EXCESS_PRECISION_TYPE_FAST,
+  EXCESS_PRECISION_TYPE_FLOAT16
 };
 
 /* Level of size optimization.  */
@@ -441,8 +445,10 @@ enum optimize_size_level
 };
 
 /* Support for user-provided GGC and PCH markers.  The first parameter
-   is a pointer to a pointer, the second a cookie.  */
-typedef void (*gt_pointer_operator) (void *, void *);
+   is a pointer to a pointer, the second either NULL if the pointer to
+   pointer points into a GC object or the actual pointer address if
+   the first argument points to a temporary and the third a cookie.  */
+typedef void (*gt_pointer_operator) (void *, void *, void *);
 
 #if !defined (HAVE_UCHAR)
 typedef unsigned char uchar;
@@ -458,7 +464,7 @@ typedef unsigned char uchar;
 /* On targets that don't need polynomial offsets, target-specific code
    should be able to treat poly_int like a normal constant, with a
    conversion operator going from the former to the latter.  We also
-   allow this for gencondmd.c for all targets, so that we can treat
+   allow this for gencondmd.cc for all targets, so that we can treat
    machine_modes as enums without causing build failures.  */
 #if (defined (IN_TARGET_CODE) \
      && (defined (USE_ENUM_MODES) || NUM_POLY_INT_COEFFS == 1))

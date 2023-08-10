@@ -1,7 +1,7 @@
 // { dg-do run { target c++14 } }
 // { dg-options "-g -O0" }
 
-// Copyright (C) 2014-2021 Free Software Foundation, Inc.
+// Copyright (C) 2014-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -18,9 +18,6 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-// Type printers only recognize the old std::string for now.
-#define _GLIBCXX_USE_CXX11_ABI 0
-
 #include <experimental/any>
 #include <experimental/optional>
 #include <experimental/string_view>
@@ -35,6 +32,12 @@ using std::experimental::string_view;
 int
 main()
 {
+  // Ensure debug info for std::string is issued in the local
+  // translation unit, so that GDB won't pick up any alternate
+  // std::string notion that might be present in libstdc++.so.
+  std::string bah = "hi";
+  (void)bah;
+
   string_view str = "string";
 // { dg-final { note-test str "\"string\"" } }
 

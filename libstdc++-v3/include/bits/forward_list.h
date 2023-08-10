@@ -1,6 +1,6 @@
 // <forward_list.h> -*- C++ -*-
 
-// Copyright (C) 2008-2021 Free Software Foundation, Inc.
+// Copyright (C) 2008-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -406,6 +406,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
    *  and fixed time insertion/deletion at any point in the sequence.
    *
    *  @ingroup sequences
+   *  @headerfile forward_list
+   *  @since C++11
    *
    *  @tparam _Tp  Type of element.
    *  @tparam _Alloc  Allocator type, defaults to allocator<_Tp>.
@@ -480,7 +482,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  @param  __list  Input list to copy.
        *  @param  __al    An allocator object.
        */
-      forward_list(const forward_list& __list, const _Alloc& __al)
+      forward_list(const forward_list& __list,
+		   const __type_identity_t<_Alloc>& __al)
       : _Base(_Node_alloc_type(__al))
       { _M_range_initialize(__list.begin(), __list.end()); }
 
@@ -508,7 +511,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  @param  __list  Input list to move.
        *  @param  __al    An allocator object.
        */
-      forward_list(forward_list&& __list, const _Alloc& __al)
+      forward_list(forward_list&& __list,
+		   const __type_identity_t<_Alloc>& __al)
       noexcept(_Node_alloc_traits::_S_always_equal())
       : forward_list(std::move(__list), _Node_alloc_type(__al),
 		     typename _Node_alloc_traits::is_always_equal{})

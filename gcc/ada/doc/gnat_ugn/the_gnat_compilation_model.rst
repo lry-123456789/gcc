@@ -168,7 +168,7 @@ GNAT also supports several other 8-bit coding schemes:
 
 *ISO 8859-15 (Latin-9)*
   ISO 8859-15 (Latin-9) letters allowed in identifiers, with uppercase and
-  lowercase equivalence
+  lowercase equivalence.
 
 .. index:: code page 437 (IBM PC)
 
@@ -1401,6 +1401,8 @@ recognized by GNAT::
      Ada_2005
      Ada_12
      Ada_2012
+     Ada_2022
+     Aggregate_Individually_Assign
      Allow_Integer_Address
      Annotate
      Assertion_Policy
@@ -1409,16 +1411,12 @@ recognized by GNAT::
      Check_Float_Overflow
      Check_Name
      Check_Policy
-     Compile_Time_Error
-     Compile_Time_Warning
-     Compiler_Unit
-     Compiler_Unit_Warning
      Component_Alignment
      Convention_Identifier
      Debug_Policy
-     Detect_Blocking
      Default_Scalar_Storage_Order
      Default_Storage_Pool
+     Detect_Blocking
      Disable_Atomic_Synchronization
      Discard_Names
      Elaboration_Checks
@@ -1437,7 +1435,6 @@ recognized by GNAT::
      Locking_Policy
      No_Component_Reordering
      No_Heap_Finalization
-     No_Run_Time
      No_Strict_Aliasing
      Normalize_Scalars
      Optimize_Alignment
@@ -1449,17 +1446,12 @@ recognized by GNAT::
      Priority_Specific_Dispatching
      Profile
      Profile_Warnings
-     Propagate_Exceptions
      Queuing_Policy
-     Rational
-     Ravenscar
      Rename_Pragma
-     Restricted_Run_Time
      Restrictions
-     Restrictions_Warnings
+     Restriction_Warnings
      Reviewable
      Short_Circuit_And_Or
-     Short_Descriptors
      Source_File_Name
      Source_File_Name_Project
      SPARK_Mode
@@ -1468,7 +1460,6 @@ recognized by GNAT::
      Suppress_Exception_Locations
      Task_Dispatching_Policy
      Unevaluated_Use_Of_Old
-     Universal_Data
      Unsuppress
      Use_VADS_Size
      Validity_Checks
@@ -1514,7 +1505,7 @@ only to the unit in which the pragma appears, and not to any other units.
 The exception is No_Elaboration_Code which always applies to the entire
 object file from a compilation, i.e. to the body, spec, and all subunits.
 This restriction can be specified in a configuration pragma file, or it
-can be on the body and/or the spec (in eithe case it applies to all the
+can be on the body and/or the spec (in either case it applies to all the
 relevant units). It can appear on a subunit only if it has previously
 appeared in the body of spec.
 
@@ -1752,8 +1743,7 @@ The following information is contained in the :file:`ALI` file.
   if any of these units are modified.
 
 * Cross-reference data. Contains information on all entities referenced
-  in the unit. Used by tools like ``gnatxref`` and ``gnatfind`` to
-  provide cross-reference information.
+  in the unit. Used by some tools to provide cross-reference information.
 
 For a full detailed description of the format of the :file:`ALI` file,
 see the source of the body of unit ``Lib.Writ``, contained in file
@@ -1788,8 +1778,8 @@ default, that contains calls to the elaboration procedures of those
 compilation unit that require them, followed by
 a call to the main program. This Ada program is compiled to generate the
 object file for the main program. The name of
-the Ada file is :file:`b~xxx`.adb` (with the corresponding spec
-:file:`b~xxx`.ads`) where ``xxx`` is the name of the
+the Ada file is :file:`b~xxx.adb` (with the corresponding spec
+:file:`b~xxx.ads`) where ``xxx`` is the name of the
 main program unit.
 
 Finally, the linker is used to build the resulting executable program,
@@ -1984,7 +1974,7 @@ process (see the *Installing a Library with Project Files* section of the
 When project files are not an option, it is also possible, but not recommended,
 to install the library so that the sources needed to use the library are on the
 Ada source path and the ALI files & libraries be on the Ada Object path (see
-:ref:`Search_Paths_and_the_Run-Time_Library_RTL`. Alternatively, the system
+:ref:`Search_Paths_and_the_Run-Time_Library_RTL`). Alternatively, the system
 administrator can place general-purpose libraries in the default compiler
 paths, by specifying the libraries' location in the configuration files
 :file:`ada_source_path` and :file:`ada_object_path`. These configuration files
@@ -2018,8 +2008,8 @@ be :file:`adalib`).
 You can also specify a new default path to the run-time library at compilation
 time with the switch :switch:`--RTS=rts-path`. You can thus choose / change
 the run-time library you want your program to be compiled with. This switch is
-recognized by ``gcc``, ``gnatmake``, ``gnatbind``,
-``gnatls``, ``gnatfind`` and ``gnatxref``.
+recognized by ``gcc``, ``gnatmake``, ``gnatbind``, ``gnatls``, and all
+project aware tools.
 
 It is possible to install a library before or after the standard GNAT
 library, by reordering the lines in the configuration files. In general, a
@@ -2340,6 +2330,9 @@ Consequently, the
 finalization of all Ada libraries must be performed at the end of the program.
 No call to these libraries or to the Ada run-time library should be made
 after the finalization phase.
+
+Information on limitations of binding Ada code in non-Ada contexts can be
+found under :ref:`Binding_with_Non-Ada_Main_Programs`.
 
 Note also that special care must be taken with multi-tasks
 applications. The initialization and finalization routines are not
@@ -3600,7 +3593,7 @@ Convention identifiers are recognized by GNAT:
   Ada compiler for further details on elaboration.
 
   However, it is not possible to mix the tasking run time of GNAT and
-  HP Ada 83, All the tasking operations must either be entirely within
+  HP Ada 83, all the tasking operations must either be entirely within
   GNAT compiled sections of the program, or entirely within HP Ada 83
   compiled sections of the program.
 
@@ -3725,14 +3718,14 @@ Convention identifiers are recognized by GNAT:
     to perform dimensional checks:
 
 
-  .. code-block:: ada
+    .. code-block:: ada
 
-      type Distance is new Long_Float;
-      type Time     is new Long_Float;
-      type Velocity is new Long_Float;
-      function "/" (D : Distance; T : Time)
-        return Velocity;
-      pragma Import (Intrinsic, "/");
+        type Distance is new Long_Float;
+        type Time     is new Long_Float;
+        type Velocity is new Long_Float;
+        function "/" (D : Distance; T : Time)
+          return Velocity;
+        pragma Import (Intrinsic, "/");
 
     This common idiom is often programmed with a generic definition and an
     explicit body. The pragma makes it simpler to introduce such declarations.
@@ -3820,7 +3813,7 @@ Interfacing to C++
 
 GNAT supports interfacing with the G++ compiler (or any C++ compiler
 generating code that is compatible with the G++ Application Binary
-Interface ---see http://www.codesourcery.com/archives/cxx-abi).
+Interface ---see http://itanium-cxx-abi.github.io/cxx-abi/abi.html).
 
 Interfacing can be done at 3 levels: simple data, subprograms, and
 classes. In the first two cases, GNAT offers a specific ``Convention C_Plus_Plus``
@@ -3868,7 +3861,7 @@ considered:
 
 
 * Using GNAT and G++ from two different GCC installations: If both
-  compilers are on the :envvar`PATH`, the previous method may be used. It is
+  compilers are on the :envvar:`PATH`, the previous method may be used. It is
   important to note that environment variables such as
   :envvar:`C_INCLUDE_PATH`, :envvar:`GCC_EXEC_PREFIX`,
   :envvar:`BINUTILS_ROOT`, and
@@ -4503,6 +4496,53 @@ finalizing the Ada run-time system along the way:
        return 0;
      }
 
+.. _Partition_Wide_Settings:
+
+Partition-Wide Settings
+-----------------------
+
+When building a mixed-language application it is important to be aware that
+Ada enforces some partition-wide settings that may implicitly impact the
+behavior of the other languages.
+
+This is the case of certain signals that are reserved to the
+implementation to implement proper Ada semantics (such as the behavior
+of ``abort`` statements).
+
+It means that the Ada part of the application may override signal handlers
+that were previously installed by either the system or by other user code.
+
+If your application requires that either system or user signals be preserved
+then you need to instruct the Ada part not to install its own signal handler.
+This is done using ``pragma Interrupt_State`` that provides a general
+mechanism for overriding such uses of interrupts.
+
+The set of interrupts for which the Ada run-time library sets a specific signal
+handler is the following:
+
+* Ada.Interrupts.Names.SIGSEGV
+* Ada.Interrupts.Names.SIGBUS
+* Ada.Interrupts.Names.SIGFPE
+* Ada.Interrupts.Names.SIGILL
+* Ada.Interrupts.Names.SIGABRT
+
+The run-time library can be instructed not to install its signal handler for a
+particular signal by using the configuration pragma ``Interrupt_State`` in the
+Ada code. For example:
+
+.. code-block:: ada
+
+   pragma Interrupt_State (Ada.Interrupts.Names.SIGSEGV, System);
+   pragma Interrupt_State (Ada.Interrupts.Names.SIGBUS,  System);
+   pragma Interrupt_State (Ada.Interrupts.Names.SIGFPE,  System);
+   pragma Interrupt_State (Ada.Interrupts.Names.SIGILL,  System);
+   pragma Interrupt_State (Ada.Interrupts.Names.SIGABRT, System);
+
+Obviously, if the Ada run-time system cannot set these handlers it comes with the
+drawback of not fully preserving Ada semantics. ``SIGSEGV``, ``SIGBUS``, ``SIGFPE``
+and ``SIGILL`` are used to raise corresponding Ada exceptions in the application,
+while ``SIGABRT`` is used to asynchronously abort an action or a task.
+
 .. _Generating_Ada_Bindings_for_C_and_C++_headers:
 
 Generating Ada Bindings for C and C++ headers
@@ -4526,8 +4566,8 @@ Some of the known limitations include:
   constants. Function macros (macros with arguments) are partially translated
   as comments, to be completed manually if needed.
 * some extensions (e.g. vector types) are not supported
-* pointers to pointers or complex structures are mapped to System.Address
-* identifiers with identical name (except casing) will generate compilation
+* pointers to pointers are mapped to System.Address
+* identifiers with identical name (except casing) may generate compilation
   errors (e.g. ``shm_get`` vs ``SHM_GET``).
 
 The code is generated using Ada 2012 syntax, which makes it easier to interface
@@ -4546,14 +4586,17 @@ header files needed by these files transitively. For example:
 
 .. code-block:: sh
 
-      $ g++ -c -fdump-ada-spec -C /usr/include/time.h
+      $ gcc -c -fdump-ada-spec -C /usr/include/time.h
       $ gcc -c *.ads
 
 will generate, under GNU/Linux, the following files: :file:`time_h.ads`,
 :file:`bits_time_h.ads`, :file:`stddef_h.ads`, :file:`bits_types_h.ads` which
 correspond to the files :file:`/usr/include/time.h`,
-:file:`/usr/include/bits/time.h`, etc..., and will then compile these Ada specs
-in Ada 2005 mode.
+:file:`/usr/include/bits/time.h`, etc..., and then compile these Ada specs.
+That is to say, the name of the Ada specs is in keeping with the relative path
+under :file:`/usr/include/` of the header files. This behavior is specific to
+paths ending with :file:`/include/`; in all the other cases, the name of the
+Ada specs is derived from the simple name of the header files instead.
 
 The :switch:`-C` switch tells ``gcc`` to extract comments from headers,
 and will attempt to generate corresponding Ada comments.
@@ -4564,39 +4607,8 @@ can use instead the :switch:`-fdump-ada-spec-slim` switch.
 You can optionally specify a parent unit, of which all generated units will
 be children, using :switch:`-fada-spec-parent={unit}`.
 
-Note that we recommend when possible to use the *g++* driver to
-generate bindings, even for most C headers, since this will in general
-generate better Ada specs. For generating bindings for C++ headers, it is
-mandatory to use the *g++* command, or *gcc -x c++* which
-is equivalent in this case. If *g++* cannot work on your C headers
-because of incompatibilities between C and C++, then you can fallback to
-``gcc`` instead.
-
-For an example of better bindings generated from the C++ front-end,
-the name of the parameters (when available) are actually ignored by the C
-front-end. Consider the following C header:
-
-.. code-block:: c
-
-     extern void foo (int variable);
-
-with the C front-end, ``variable`` is ignored, and the above is handled as:
-
-.. code-block:: c
-
-     extern void foo (int);
-
-generating a generic:
-
-.. code-block:: ada
-
-     procedure foo (param1 : int);
-
-with the C++ front-end, the name is available, and we generate:
-
-.. code-block:: ada
-
-     procedure foo (variable : int);
+The simple ``gcc``-based command works only for C headers. For C++ headers
+you need to use either the ``g++`` command or the combination ``gcc -x c++``.
 
 In some cases, the generated bindings will be more complete or more meaningful
 when defining some macros, which you can do via the :switch:`-D` switch. This
@@ -4604,7 +4616,7 @@ is for example the case with :file:`Xlib.h` under GNU/Linux:
 
 .. code-block:: sh
 
-      $ g++ -c -fdump-ada-spec -DXLIB_ILLEGAL_ACCESS -C /usr/include/X11/Xlib.h
+      $ gcc -c -fdump-ada-spec -DXLIB_ILLEGAL_ACCESS -C /usr/include/X11/Xlib.h
 
 The above will generate more complete bindings than a straight call without
 the :switch:`-DXLIB_ILLEGAL_ACCESS` switch.
@@ -4626,7 +4638,7 @@ and then generate Ada bindings from this file:
 
 .. code-block:: sh
 
-      $ g++ -c -fdump-ada-spec readline1.h
+      $ gcc -c -fdump-ada-spec readline1.h
 
 
 .. _Generating_bindings_for_C++_headers:
@@ -4851,7 +4863,7 @@ GNAT and Other Compilation Models
 =================================
 
 This section compares the GNAT model with the approaches taken in
-other environents, first the C/C++ model and then the mechanism that
+other environments, first the C/C++ model and then the mechanism that
 has been used in other Ada systems, in particular those traditionally
 used for Ada 83.
 

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2000-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2000-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -45,7 +45,8 @@ package body Live is
    --  any valuable per-node space and possibly results in better locality and
    --  cache usage.
 
-   type Name_Set is array (Node_Id range <>) of Boolean;
+   type Name_Set is array (Node_Id'Base range <>) of Boolean;
+   --  We use 'Base here, in case we want to add a predicate to Node_Id
    pragma Pack (Name_Set);
 
    function Marked (Marks : Name_Set; Name : Node_Id) return Boolean;
@@ -343,7 +344,7 @@ package body Live is
                end if;
 
             when N_Entity'Range =>
-               if (Ekind (N) = E_Component) and then not Marked (Marks, N) then
+               if Ekind (N) = E_Component and then not Marked (Marks, N) then
                   if Present (Discriminant_Checking_Func (N)) then
                      Process (Discriminant_Checking_Func (N));
                   end if;

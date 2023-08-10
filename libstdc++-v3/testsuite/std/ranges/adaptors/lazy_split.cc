@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -22,6 +22,8 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 #include <testsuite_hooks.h>
 #include <testsuite_iterators.h>
 
@@ -163,10 +165,15 @@ test09()
   static_assert(!requires { lazy_split(p)(); });
   static_assert(!requires { s | lazy_split; });
 
-  static_assert(!requires { s | lazy_split(p); });
-  static_assert(!requires { lazy_split(p)(s); });
-  static_assert(!requires { s | (lazy_split(p) | views::all); });
-  static_assert(!requires { (lazy_split(p) | views::all)(s); });
+  // Test the case where the closure object is used as an rvalue and therefore
+  // the copy of p is forwarded as an rvalue.
+  // This used to be invalid, but is now well-formed after P2415R2 relaxed
+  // the requirements of viewable_range to admit rvalue non-view non-borrowed
+  // ranges such as std::string&&.
+  static_assert(requires { s | lazy_split(p); });
+  static_assert(requires { lazy_split(p)(s); });
+  static_assert(requires { s | (lazy_split(p) | views::all); });
+  static_assert(requires { (lazy_split(p) | views::all)(s); });
 
   static_assert(requires { s | lazy_split(views::all(p)); });
   static_assert(requires { lazy_split(views::all(p))(s); });
@@ -212,6 +219,20 @@ test11()
   static_assert(ranges::distance(views::lazy_split("text"sv, ""sv)) == 4);
 }
 
+constexpr bool
+test12()
+{
+  // LWG 3904
+  auto r = views::single(0) | views::lazy_split(0);
+  auto i = r.begin();
+  ++i;
+  VERIFY( i != r.end() );
+  decltype(std::as_const(r).begin()) j = i;
+  VERIFY( j != r.end() );
+
+  return true;
+}
+
 int
 main()
 {
@@ -226,4 +247,5 @@ main()
   test09();
   test10();
   test11();
+  static_assert(test12());
 }

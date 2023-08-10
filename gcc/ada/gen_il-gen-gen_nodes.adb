@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---           Copyright (C) 2020-2021, Free Software Foundation, Inc.        --
+--           Copyright (C) 2020-2023, Free Software Foundation, Inc.        --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -170,13 +170,15 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Selector_Name, Node_Id, Default_Empty),
         Sm (Atomic_Sync_Required, Flag),
         Sm (Has_Private_View, Flag),
+        Sm (Has_Secondary_Private_View, Flag),
         Sm (Is_Elaboration_Checks_OK_Node, Flag),
         Sm (Is_Elaboration_Warnings_OK_Node, Flag),
         Sm (Is_SPARK_Mode_On_Node, Flag),
         Sm (Redundant_Use, Flag)));
 
    Ab (N_Direct_Name, N_Has_Entity,
-       (Sm (Has_Private_View, Flag)));
+       (Sm (Has_Private_View, Flag),
+        Sm (Has_Secondary_Private_View, Flag)));
 
    Cc (N_Identifier, N_Direct_Name,
        (Sy (Chars, Name_Id, Default_No_Name),
@@ -197,7 +199,8 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Ab (N_Op, N_Has_Entity,
        (Sm (Do_Overflow_Check, Flag),
-        Sm (Has_Private_View, Flag)));
+        Sm (Has_Private_View, Flag),
+        Sm (Has_Secondary_Private_View, Flag)));
 
    Ab (N_Binary_Op, N_Op);
 
@@ -401,8 +404,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Function_Call, N_Subprogram_Call,
        (Sy (Name, Node_Id, Default_Empty),
         Sy (Parameter_Associations, List_Id, Default_No_List),
-        Sm (Is_Expanded_Build_In_Place_Call, Flag),
-        Sm (No_Side_Effect_Removal, Flag)));
+        Sm (Is_Expanded_Build_In_Place_Call, Flag)));
 
    Cc (N_Procedure_Call_Statement, N_Subprogram_Call,
        (Sy (Name, Node_Id, Default_Empty),
@@ -440,6 +442,9 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Is_Folded_In_Parser, Flag),
         Sm (Has_Wide_Character, Flag),
         Sm (Has_Wide_Wide_Character, Flag)));
+
+   Cc (N_Interpolated_String_Literal, N_Numeric_Or_String_Literal,
+       (Sy (Expressions, List_Id, Default_No_List)));
 
    Cc (N_Explicit_Dereference, N_Subexpr,
        (Sy (Prefix, Node_Id),
@@ -481,7 +486,9 @@ begin -- Gen_IL.Gen.Gen_Nodes
        (Sy (Expressions, List_Id, Default_No_List),
         Sy (Component_Associations, List_Id, Default_No_List),
         Sy (Null_Record_Present, Flag),
+        Sy (Is_Parenthesis_Aggregate, Flag),
         Sy (Is_Homogeneous_Aggregate, Flag),
+        Sy (Is_Enum_Array_Aggregate, Flag),
         Sm (Aggregate_Bounds, Node_Id),
         Sm (Entity_Or_Associated_Node, Node_Id), -- just Associated_Node
         Sm (Compile_Time_Known_Aggregate, Flag),
@@ -492,7 +499,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
        (Sy (Expression, Node_Id, Default_Empty),
         Sy (Subpool_Handle_Name, Node_Id, Default_Empty),
         Sy (Null_Exclusion_Present, Flag, Default_False),
-        Sm (Alloc_For_BIP_Return, Flag),
+        Sm (For_Special_Return_Object, Flag),
         Sm (Do_Storage_Check, Flag),
         Sm (Is_Dynamic_Coextension, Flag),
         Sm (Is_Static_Coextension, Flag),
@@ -507,6 +514,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Cc (N_Delta_Aggregate, N_Subexpr,
        (Sy (Expression, Node_Id, Default_Empty),
+        Sy (Is_Homogeneous_Aggregate, Flag),
         Sy (Component_Associations, List_Id, Default_No_List)));
 
    Cc (N_Extension_Aggregate, N_Subexpr,
@@ -520,13 +528,13 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Cc (N_Raise_Expression, N_Subexpr,
        (Sy (Name, Node_Id, Default_Empty),
-        Sy (Expression, Node_Id, Default_Empty),
-        Sm (Convert_To_Return_False, Flag)));
+        Sy (Expression, Node_Id, Default_Empty)));
 
    Cc (N_Range, N_Subexpr,
        (Sy (Low_Bound, Node_Id),
         Sy (High_Bound, Node_Id),
-        Sy (Includes_Infinities, Flag)));
+        Sm (Cannot_Be_Superflat, Flag),
+        Sm (Includes_Infinities, Flag)));
 
    Cc (N_Reference, N_Subexpr,
        (Sy (Prefix, Node_Id)));
@@ -577,7 +585,8 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Ab (N_Declaration, Node_Kind);
    --  Note: this includes all constructs normally thought of as declarations
-   --  except those that are separately grouped in N_Later_Decl_Item.
+   --  except those that are separately grouped in N_Later_Decl_Item. But
+   --  Declaration_Node may return yet more node types; see N_Is_Decl below.
 
    Cc (N_Component_Declaration, N_Declaration,
        (Sy (Defining_Identifier, Node_Id),
@@ -801,13 +810,15 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Package_Body, N_Unit_Body,
        (Sy (Defining_Unit_Name, Node_Id),
         Sy (Declarations, List_Id, Default_No_List),
-        Sy (Handled_Statement_Sequence, Node_Id, Default_Empty)));
+        Sy (Handled_Statement_Sequence, Node_Id, Default_Empty),
+        Sy (At_End_Proc, Node_Id, Default_Empty)));
 
    Cc (N_Subprogram_Body, N_Unit_Body,
        (Sy (Specification, Node_Id),
         Sy (Declarations, List_Id, Default_No_List),
         Sy (Handled_Statement_Sequence, Node_Id, Default_Empty),
         Sy (Bad_Is_Detected, Flag),
+        Sy (At_End_Proc, Node_Id, Default_Empty),
         Sm (Activation_Chain_Entity, Node_Id),
         Sm (Acts_As_Spec, Flag),
         Sm (Corresponding_Entry_Body, Node_Id),
@@ -829,6 +840,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
        (Sy (Defining_Identifier, Node_Id),
         Sy (Declarations, List_Id, Default_No_List),
         Sy (Handled_Statement_Sequence, Node_Id, Default_Empty),
+        Sy (At_End_Proc, Node_Id, Default_Empty),
         Sm (Activation_Chain_Entity, Node_Id),
         Sm (Is_Task_Master, Flag)));
 
@@ -900,6 +912,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Subtype_Mark, Node_Id, Default_Empty),
         Sy (Access_Definition, Node_Id, Default_Empty),
         Sy (Name, Node_Id, Default_Empty),
+        Sm (Comes_From_Iterator, Flag),
         Sm (Corresponding_Generic_Association, Node_Id)));
 
    Cc (N_Package_Renaming_Declaration, N_Renaming_Declaration,
@@ -959,6 +972,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Is_Elaboration_Code, Flag),
         Sm (Is_SPARK_Mode_On_Node, Flag),
         Sm (No_Ctrl_Actions, Flag),
+        Sm (No_Finalize_Actions, Flag),
         Sm (Suppress_Assignment_Checks, Flag)));
 
    Cc (N_Asynchronous_Select, N_Statement_Other_Than_Procedure_Call,
@@ -972,6 +986,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Has_Created_Identifier, Flag),
         Sy (Is_Asynchronous_Call_Block, Flag),
         Sy (Is_Task_Allocation_Block, Flag),
+        Sy (At_End_Proc, Node_Id, Default_Empty),
         Sm (Activation_Chain_Entity, Node_Id),
         Sm (Cleanup_Actions, List_Id),
         Sm (Exception_Junk, Flag),
@@ -983,7 +998,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Case_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Expression, Node_Id, Default_Empty),
         Sy (Alternatives, List_Id, Default_No_List),
-        Sy (End_Span, Uint, Default_Uint_0),
+        Sy (End_Span, Unat, Default_Uint_0),
         Sm (From_Conditional_Expression, Flag)));
 
    Cc (N_Code_Statement, N_Statement_Other_Than_Procedure_Call,
@@ -1040,8 +1055,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Cc (N_Raise_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Name, Node_Id, Default_Empty),
-        Sy (Expression, Node_Id, Default_Empty),
-        Sm (From_At_End, Flag)));
+        Sy (Expression, Node_Id, Default_Empty)));
 
    Cc (N_Raise_When_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Name, Node_Id, Default_Empty),
@@ -1057,7 +1071,6 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Cc (N_Simple_Return_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Expression, Node_Id, Default_Empty),
-        Sm (By_Ref, Flag),
         Sm (Comes_From_Extended_Return_Statement, Flag),
         Sm (Procedure_To_Call, Node_Id),
         Sm (Return_Statement_Entity, Node_Id),
@@ -1066,7 +1079,6 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Extended_Return_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Return_Object_Declarations, List_Id),
         Sy (Handled_Statement_Sequence, Node_Id, Default_Empty),
-        Sm (By_Ref, Flag),
         Sm (Procedure_To_Call, Node_Id),
         Sm (Return_Statement_Entity, Node_Id),
         Sm (Storage_Pool, Node_Id)));
@@ -1093,8 +1105,9 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Then_Statements, List_Id),
         Sy (Elsif_Parts, List_Id, Default_No_List),
         Sy (Else_Statements, List_Id, Default_No_List),
-        Sy (End_Span, Uint, Default_Uint_0),
-        Sm (From_Conditional_Expression, Flag)));
+        Sy (End_Span, Unat, Default_Uint_0),
+        Sm (From_Conditional_Expression, Flag),
+        Sm (Comes_From_Check_Or_Contract, Flag)));
 
    Cc (N_Accept_Alternative, Node_Kind,
        (Sy (Accept_Statement, Node_Id),
@@ -1135,11 +1148,13 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Formal_Abstract_Subprogram_Declaration, N_Formal_Subprogram_Declaration,
        (Sy (Specification, Node_Id),
         Sy (Default_Name, Node_Id, Default_Empty),
+        Sy (Expression, Node_Id, Default_Empty),
         Sy (Box_Present, Flag)));
 
    Cc (N_Formal_Concrete_Subprogram_Declaration, N_Formal_Subprogram_Declaration,
        (Sy (Specification, Node_Id),
         Sy (Default_Name, Node_Id, Default_Empty),
+        Sy (Expression, Node_Id, Default_Empty),
         Sy (Box_Present, Flag)));
 
    Ab (N_Push_Pop_xxx_Label, Node_Kind);
@@ -1332,7 +1347,9 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Entry_Body_Formal_Part, Node_Id),
         Sy (Declarations, List_Id, Default_No_List),
         Sy (Handled_Statement_Sequence, Node_Id, Default_Empty),
-        Sm (Activation_Chain_Entity, Node_Id)));
+        Sy (At_End_Proc, Node_Id, Default_Empty),
+        Sm (Activation_Chain_Entity, Node_Id),
+        Sm (Corresponding_Spec, Node_Id)));
 
    Cc (N_Entry_Call_Alternative, Node_Kind,
        (Sy (Entry_Call_Statement, Node_Id),
@@ -1419,8 +1436,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
        (Sy (Statements, List_Id, Default_Empty_List),
         Sy (End_Label, Node_Id, Default_Empty),
         Sy (Exception_Handlers, List_Id, Default_No_List),
-        Sy (At_End_Proc, Node_Id, Default_Empty),
-        Sm (First_Real_Statement, Node_Id)));
+        Sy (At_End_Proc, Node_Id, Default_Empty)));
 
    Cc (N_Index_Or_Discriminant_Constraint, Node_Kind,
        (Sy (Constraints, List_Id)));
@@ -1648,5 +1664,81 @@ begin -- Gen_IL.Gen.Gen_Nodes
              N_Iteration_Scheme,
              N_Terminate_Alternative));
    --  Nodes with condition fields (does not include N_Raise_xxx_Error)
+
+   Union (N_Has_Bounds,
+          Children =>
+            (N_Range,
+             N_Real_Range_Specification,
+             N_Signed_Integer_Type_Definition));
+   --  Nodes that have Low_Bound and High_Bound defined
+
+   Union (N_Is_Index,
+          Children =>
+            (N_Has_Bounds,
+             N_Has_Entity,
+             N_Subtype_Indication));
+   --  Nodes that can be an index of an array
+
+   Union (N_Entity_Name,
+          Children =>
+            (N_Expanded_Name,
+             N_Identifier,
+             N_Operator_Symbol));
+   --  Nodes that are definitely representing an entity.
+   --  Some N_Attribute_Reference nodes may also represent an entity. See
+   --  Is_Entity_Name.
+
+   Union (N_Is_Decl,
+          Children =>
+            (N_Aggregate,
+             N_Block_Statement,
+             N_Declaration,
+             N_Discriminant_Specification,
+             N_Entry_Index_Specification,
+             N_Enumeration_Type_Definition,
+             N_Exception_Handler,
+             N_Explicit_Dereference,
+             N_Expression_With_Actions,
+             N_Extension_Aggregate,
+             N_Identifier,
+             N_Iterated_Component_Association,
+             N_Later_Decl_Item,
+             N_Loop_Statement,
+             N_Null_Statement,
+             N_Number_Declaration,
+             N_Package_Specification,
+             N_Parameter_Specification,
+             N_Renaming_Declaration,
+             N_Quantified_Expression));
+   --  Nodes that can be returned by Declaration_Node; it can also return
+   --  Empty. Not all of these are true "declarations", but Declaration_Node
+   --  can return them in some cases.
+
+   Union (N_Is_Range,
+          Children =>
+            (N_Character_Literal,
+             N_Entity_Name,
+             N_Has_Bounds,
+             N_Integer_Literal,
+             N_Subtype_Indication));
+   --  Nodes that can be used to specify a range
+
+   Union (N_Is_Case_Choice,
+          Children =>
+            (N_Is_Range,
+             N_Others_Choice));
+   --  Nodes that can be in the choices of a case statement
+
+   Union (N_Is_Exception_Choice,
+          Children =>
+            (N_Entity_Name,
+             N_Others_Choice));
+   --  Nodes that can be in the choices of an exception handler
+
+   Union (N_Alternative,
+          Children =>
+            (N_Case_Statement_Alternative,
+             N_Variant));
+   --  Nodes that can be alternatives in case contructs
 
 end Gen_IL.Gen.Gen_Nodes;

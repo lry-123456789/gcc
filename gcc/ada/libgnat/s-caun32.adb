@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2002-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2002-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -52,6 +52,9 @@ package body System.Compare_Array_Unsigned_32 is
    -----------------------
    -- Compare_Array_U32 --
    -----------------------
+
+   pragma Annotate (Gnatcheck, Exempt_On, "Improper_Returns",
+                    "early returns for performance");
 
    function Compare_Array_U32
      (Left      : System.Address;
@@ -113,4 +116,5 @@ package body System.Compare_Array_Unsigned_32 is
       end if;
    end Compare_Array_U32;
 
+   pragma Annotate (Gnatcheck, Exempt_Off, "Improper_Returns");
 end System.Compare_Array_Unsigned_32;

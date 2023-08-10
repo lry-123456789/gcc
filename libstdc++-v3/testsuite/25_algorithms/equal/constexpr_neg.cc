@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -16,7 +16,7 @@
 // <http://www.gnu.org/licenses/>.
 
 // { dg-options "-std=gnu++2a" }
-// { dg-do compile { target c++2a xfail *-*-* } }
+// { dg-do compile { target c++2a } }
 // { dg-require-normal-mode "" }
 
 #include <algorithm>
@@ -32,7 +32,7 @@ test01()
   return outa;
 }
 
-static_assert(test01()); // { dg-error "outside the bounds" }
+static_assert(test01()); // { dg-error "non-constant condition" }
 
 constexpr bool
 test02()
@@ -44,7 +44,8 @@ test02()
   return outa;
 }
 
-static_assert(test02()); // { dg-error "outside the bounds" }
+static_assert(test02()); // { dg-error "non-constant condition" }
 
-// { dg-prune-output "non-constant condition" }
+// Errors occuring within <algorithm> internals:
+// { dg-error "outside the bounds of array" "" { target *-*-* } 0 }
 // { dg-prune-output "in 'constexpr'" }

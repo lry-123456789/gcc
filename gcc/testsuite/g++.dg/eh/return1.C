@@ -11,13 +11,16 @@ int c, d;
 #define THROWS
 #endif
 
+extern "C" int printf (const char *, ...);
+#define DEBUG // printf ("%p %s\n", this, __PRETTY_FUNCTION__)
+
 struct X
 {
-  X(bool throws) : throws_(throws) { ++c; }
-  X(const X& x) : throws_(x.throws_) { ++c; }
+  X(bool throws) : throws_(throws) { ++c; DEBUG; }
+  X(const X& x); // not defined
   ~X() THROWS
   {
-    ++d;
+    ++d; DEBUG;
     if (throws_) { throw 1; }
   }
 private:
@@ -26,6 +29,13 @@ private:
 
 X f()
 {
+  X x(true);
+  return X(false);
+}
+
+X f2()
+{
+ foo:
   X x(true);
   return X(false);
 }
@@ -42,10 +52,56 @@ void h()
 #endif
 }
 
+X i()
+{
+  try {
+    X x(true);
+    return X(false);
+  } catch(...) {}
+  return X(false);
+}
+
+X i2()
+{
+  try {
+  foo:
+    X x(true);
+    return X(false);
+  } catch(...) {}
+  return X(false);
+}
+
+X j()
+{
+  try {
+    return X(true),X(false);
+  } catch(...) {}
+  return X(false);
+}
+
+template <class T>
+T k()
+{
+  try {
+    return T(true),T(false);
+  } catch (...) {}
+  return T(true),T(false);
+}
+
+X l() try { return X(true),X(false); }
+  catch (...) { return X(true),X(false); }
+
+template <class T>
+T m()
+  try { return T(true),T(false); }
+  catch (...) { return T(true),T(false); }
+
 int main()
 {
   try { f(); }
   catch (...) {}
+
+  try { f2(); } catch (...) {}
 
   try { g(); }
   catch (...) {}
@@ -53,6 +109,17 @@ int main()
   try { h(); }
   catch (...) {}
 
-  if (c != d)
-    throw;
+  try { i(); }
+  catch (...) {}
+
+  try { i2(); } catch (...) {}
+
+  try { j(); } catch (...) {}
+
+  try { k<X>(); } catch (...) {}
+
+  try { l(); } catch (...) {}
+  try { m<X>(); } catch (...) {}
+
+  return c - d;
 }

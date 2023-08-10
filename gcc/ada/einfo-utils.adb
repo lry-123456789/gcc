@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---           Copyright (C) 2020-2021, Free Software Foundation, Inc.        --
+--           Copyright (C) 2020-2023, Free Software Foundation, Inc.        --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -28,7 +28,6 @@ with Elists;         use Elists;
 with Nlists;         use Nlists;
 with Output;         use Output;
 with Sinfo;          use Sinfo;
-with Sinfo.Nodes;    use Sinfo.Nodes;
 with Sinfo.Utils;    use Sinfo.Utils;
 
 package body Einfo.Utils is
@@ -43,23 +42,86 @@ package body Einfo.Utils is
    --  Determine whether abstract state State_Id has particular option denoted
    --  by the name Option_Nam.
 
-   -----------------------------------
-   -- Renamings of Renamed_Or_Alias --
-   -----------------------------------
+   -------------------------------------------
+   -- Aliases/Renamings of Renamed_Or_Alias --
+   -------------------------------------------
 
-   function Alias (N : Entity_Id) return Node_Id is
+   function Alias (N : Entity_Id) return Entity_Id is
    begin
-      pragma Assert
-        (Is_Overloadable (N) or else Ekind (N) = E_Subprogram_Type);
-      return Renamed_Or_Alias (N);
+      return Val : constant Entity_Id := Renamed_Or_Alias (N) do
+         pragma Assert
+           (Is_Overloadable (N) or else Ekind (N) = E_Subprogram_Type);
+         pragma Assert (Val in N_Entity_Id | N_Empty_Id);
+      end return;
    end Alias;
 
-   procedure Set_Alias (N : Entity_Id; Val : Node_Id) is
+   procedure Set_Alias (N : Entity_Id; Val : Entity_Id) is
    begin
       pragma Assert
         (Is_Overloadable (N) or else Ekind (N) = E_Subprogram_Type);
+      pragma Assert (Val in N_Entity_Id | N_Empty_Id);
+
       Set_Renamed_Or_Alias (N, Val);
    end Set_Alias;
+
+   function Renamed_Entity (N : Entity_Id) return Entity_Id is
+   begin
+      return Val : constant Entity_Id := Renamed_Or_Alias (N) do
+         pragma Assert (not Is_Object (N) or else Etype (N) = Any_Type);
+         pragma Assert (Val in N_Entity_Id | N_Empty_Id);
+      end return;
+   end Renamed_Entity;
+
+   procedure Set_Renamed_Entity (N : Entity_Id; Val : Entity_Id) is
+   begin
+      pragma Assert (not Is_Object (N));
+      pragma Assert (Val in N_Entity_Id);
+
+      Set_Renamed_Or_Alias (N, Val);
+   end Set_Renamed_Entity;
+
+   function Renamed_Object (N : Entity_Id) return Node_Id is
+   begin
+      return Val : constant Node_Id := Renamed_Or_Alias (N) do
+         --  Formal_Kind uses the entity, not a name of it. This happens
+         --  in front-end inlining, which also sets to Empty. Also in
+         --  Exp_Ch9, where formals are renamed for the benefit of gdb.
+
+         if Ekind (N) not in Formal_Kind then
+            pragma Assert (Is_Object (N));
+            pragma Assert (Val in N_Subexpr_Id | N_Empty_Id);
+            null;
+         end if;
+      end return;
+   end Renamed_Object;
+
+   procedure Set_Renamed_Object (N : Entity_Id; Val : Node_Id) is
+   begin
+      if Ekind (N) not in Formal_Kind then
+         pragma Assert (Is_Object (N));
+         pragma Assert (Val in N_Subexpr_Id | N_Empty_Id);
+         null;
+      end if;
+
+      Set_Renamed_Or_Alias (N, Val);
+   end Set_Renamed_Object;
+
+   function Renamed_Entity_Or_Object (N : Entity_Id) return Node_Id is
+   begin
+      if Is_Object (N) then
+         return Renamed_Object (N);
+      else
+         return Renamed_Entity (N);
+      end if;
+   end Renamed_Entity_Or_Object;
+
+   procedure Set_Renamed_Object_Of_Possibly_Void
+     (N : Entity_Id; Val : Node_Id)
+   is
+   begin
+      pragma Assert (Val in N_Subexpr_Id);
+      Set_Renamed_Or_Alias (N, Val);
+   end Set_Renamed_Object_Of_Possibly_Void;
 
    ----------------
    -- Has_Option --
@@ -244,7 +306,7 @@ package body Einfo.Utils is
       return Ekind (Id) in Generic_Unit_Kind;
    end Is_Generic_Unit;
 
-   function Is_Ghost_Entity (Id : Entity_Id) return Boolean is
+   function Is_Ghost_Entity                     (Id : E) return Boolean is
    begin
       return Is_Checked_Ghost_Entity (Id) or else Is_Ignored_Ghost_Entity (Id);
    end Is_Ghost_Entity;
@@ -358,131 +420,147 @@ package body Einfo.Utils is
       return Ekind (Id) in Type_Kind;
    end Is_Type;
 
-   -----------------------------------
-   -- Field Initialization Routines --
-   -----------------------------------
+   ------------------------------------------
+   -- Type Representation Attribute Fields --
+   ------------------------------------------
 
-   procedure Init_Alignment (Id : E) is
+   function Known_Alignment (E : Entity_Id) return B is
+   begin
+      --  For some reason, Empty is passed to this sometimes
+
+      return No (E) or else not Field_Is_Initial_Zero (E, F_Alignment);
+   end Known_Alignment;
+
+   procedure Reinit_Alignment (Id : E) is
    begin
       Reinit_Field_To_Zero (Id, F_Alignment);
-   end Init_Alignment;
-
-   procedure Init_Alignment (Id : E; V : Int) is
-   begin
-      Set_Alignment (Id, UI_From_Int (V));
-   end Init_Alignment;
-
-   procedure Init_Component_Bit_Offset (Id : E) is
-   begin
-      Set_Component_Bit_Offset (Id, No_Uint);
-   end Init_Component_Bit_Offset;
-
-   procedure Init_Component_Bit_Offset (Id : E; V : Int) is
-   begin
-      Set_Component_Bit_Offset (Id, UI_From_Int (V));
-   end Init_Component_Bit_Offset;
-
-   procedure Init_Component_Size (Id : E) is
-   begin
-      Set_Component_Size (Id, Uint_0);
-   end Init_Component_Size;
-
-   procedure Init_Component_Size (Id : E; V : Int) is
-   begin
-      Set_Component_Size (Id, UI_From_Int (V));
-   end Init_Component_Size;
-
-   procedure Init_Digits_Value (Id : E) is
-   begin
-      Set_Digits_Value (Id, Uint_0);
-   end Init_Digits_Value;
-
-   procedure Init_Digits_Value (Id : E; V : Int) is
-   begin
-      Set_Digits_Value (Id, UI_From_Int (V));
-   end Init_Digits_Value;
-
-   procedure Init_Esize (Id : E) is
-   begin
-      Set_Esize (Id, Uint_0);
-   end Init_Esize;
-
-   procedure Init_Esize (Id : E; V : Int) is
-   begin
-      Set_Esize (Id, UI_From_Int (V));
-   end Init_Esize;
-
-   procedure Init_Normalized_First_Bit (Id : E) is
-   begin
-      Set_Normalized_First_Bit (Id, No_Uint);
-   end Init_Normalized_First_Bit;
-
-   procedure Init_Normalized_First_Bit (Id : E; V : Int) is
-   begin
-      Set_Normalized_First_Bit (Id, UI_From_Int (V));
-   end Init_Normalized_First_Bit;
-
-   procedure Init_Normalized_Position (Id : E) is
-   begin
-      Set_Normalized_Position (Id, No_Uint);
-   end Init_Normalized_Position;
-
-   procedure Init_Normalized_Position (Id : E; V : Int) is
-   begin
-      Set_Normalized_Position (Id, UI_From_Int (V));
-   end Init_Normalized_Position;
-
-   procedure Init_Normalized_Position_Max (Id : E) is
-   begin
-      Set_Normalized_Position_Max (Id, No_Uint);
-   end Init_Normalized_Position_Max;
-
-   procedure Init_Normalized_Position_Max (Id : E; V : Int) is
-   begin
-      Set_Normalized_Position_Max (Id, UI_From_Int (V));
-   end Init_Normalized_Position_Max;
-
-   procedure Init_RM_Size (Id : E) is
-   begin
-      Set_RM_Size (Id, Uint_0);
-   end Init_RM_Size;
-
-   procedure Init_RM_Size (Id : E; V : Int) is
-   begin
-      Set_RM_Size (Id, UI_From_Int (V));
-   end Init_RM_Size;
+   end Reinit_Alignment;
 
    procedure Copy_Alignment (To, From : E) is
    begin
       if Known_Alignment (From) then
          Set_Alignment (To, Alignment (From));
       else
-         Init_Alignment (To);
+         Reinit_Alignment (To);
       end if;
    end Copy_Alignment;
 
-   -----------------------------
-   -- Init_Component_Location --
-   -----------------------------
-
-   procedure Init_Component_Location (Id : E) is
+   function Known_Component_Bit_Offset (E : Entity_Id) return B is
    begin
-      Set_Normalized_First_Bit  (Id, No_Uint);
-      Set_Normalized_Position_Max (Id, No_Uint);
+      return Present (Component_Bit_Offset (E));
+   end Known_Component_Bit_Offset;
+
+   function Known_Static_Component_Bit_Offset (E : Entity_Id) return B is
+   begin
+      return Known_Component_Bit_Offset (E)
+        and then Component_Bit_Offset (E) >= Uint_0;
+   end Known_Static_Component_Bit_Offset;
+
+   function Known_Component_Size (E : Entity_Id) return B is
+   begin
+      return Present (Component_Size (E));
+   end Known_Component_Size;
+
+   function Known_Static_Component_Size (E : Entity_Id) return B is
+   begin
+      return Known_Component_Size (E) and then Component_Size (E) >= Uint_0;
+   end Known_Static_Component_Size;
+
+   function Known_Esize (E : Entity_Id) return B is
+   begin
+      return Present (Esize (E));
+   end Known_Esize;
+
+   function Known_Static_Esize (E : Entity_Id) return B is
+   begin
+      return Known_Esize (E)
+        and then Esize (E) >= Uint_0
+        and then not Is_Generic_Type (E);
+   end Known_Static_Esize;
+
+   procedure Reinit_Esize (Id : E) is
+   begin
+      Reinit_Field_To_Zero (Id, F_Esize);
+   end Reinit_Esize;
+
+   procedure Copy_Esize (To, From : E) is
+   begin
+      if Known_Esize (From) then
+         Set_Esize (To, Esize (From));
+      else
+         Reinit_Esize (To);
+      end if;
+   end Copy_Esize;
+
+   function Known_Normalized_First_Bit (E : Entity_Id) return B is
+   begin
+      return Present (Normalized_First_Bit (E));
+   end Known_Normalized_First_Bit;
+
+   function Known_Static_Normalized_First_Bit (E : Entity_Id) return B is
+   begin
+      return Known_Normalized_First_Bit (E)
+        and then Normalized_First_Bit (E) >= Uint_0;
+   end Known_Static_Normalized_First_Bit;
+
+   function Known_Normalized_Position (E : Entity_Id) return B is
+   begin
+      return Present (Normalized_Position (E));
+   end Known_Normalized_Position;
+
+   function Known_Static_Normalized_Position (E : Entity_Id) return B is
+   begin
+      return Known_Normalized_Position (E)
+        and then Normalized_Position (E) >= Uint_0;
+   end Known_Static_Normalized_Position;
+
+   function Known_RM_Size (E : Entity_Id) return B is
+   begin
+      return Present (RM_Size (E));
+   end Known_RM_Size;
+
+   function Known_Static_RM_Size (E : Entity_Id) return B is
+   begin
+      return Known_RM_Size (E)
+        and then RM_Size (E) >= Uint_0
+        and then not Is_Generic_Type (E);
+   end Known_Static_RM_Size;
+
+   procedure Reinit_RM_Size (Id : E) is
+   begin
+      Reinit_Field_To_Zero (Id, F_RM_Size);
+   end Reinit_RM_Size;
+
+   procedure Copy_RM_Size (To, From : E) is
+   begin
+      if Known_RM_Size (From) then
+         Set_RM_Size (To, RM_Size (From));
+      else
+         Reinit_RM_Size (To);
+      end if;
+   end Copy_RM_Size;
+
+   -------------------------------
+   -- Reinit_Component_Location --
+   -------------------------------
+
+   procedure Reinit_Component_Location (Id : E) is
+   begin
+      Set_Normalized_First_Bit (Id, No_Uint);
       Set_Component_Bit_Offset (Id, No_Uint);
-      Set_Esize (Id, Uint_0);
+      Reinit_Esize (Id);
       Set_Normalized_Position (Id, No_Uint);
-   end Init_Component_Location;
+   end Reinit_Component_Location;
 
-   ----------------------------
-   -- Init_Object_Size_Align --
-   ----------------------------
+   ------------------------------
+   -- Reinit_Object_Size_Align --
+   ------------------------------
 
-   procedure Init_Object_Size_Align (Id : E) is
+   procedure Reinit_Object_Size_Align (Id : E) is
    begin
-      Init_Esize (Id);
-      Init_Alignment (Id);
-   end Init_Object_Size_Align;
+      Reinit_Esize (Id);
+      Reinit_Alignment (Id);
+   end Reinit_Object_Size_Align;
 
    ---------------
    -- Init_Size --
@@ -491,126 +569,30 @@ package body Einfo.Utils is
    procedure Init_Size (Id : E; V : Int) is
    begin
       pragma Assert (Is_Type (Id));
-      pragma Assert
-        (not Known_Esize (Id) or else Esize (Id) = V);
-      pragma Assert
-        (RM_Size (Id) = No_Uint
-           or else RM_Size (Id) = Uint_0
-           or else RM_Size (Id) = V);
+      pragma Assert (not Known_Esize (Id) or else Esize (Id) = V);
+      pragma Assert (not Known_RM_Size (Id) or else RM_Size (Id) = V);
+
       Set_Esize (Id, UI_From_Int (V));
       Set_RM_Size (Id, UI_From_Int (V));
    end Init_Size;
 
-   ---------------------
-   -- Init_Size_Align --
-   ---------------------
+   -----------------------
+   -- Reinit_Size_Align --
+   -----------------------
 
-   procedure Init_Size_Align (Id : E) is
+   procedure Reinit_Size_Align (Id : E) is
    begin
       pragma Assert (Ekind (Id) in Type_Kind | E_Void);
-      Init_Esize (Id);
-      Init_RM_Size (Id);
-      Init_Alignment (Id);
-   end Init_Size_Align;
-
-   ----------------------------------------------
-   -- Type Representation Attribute Predicates --
-   ----------------------------------------------
-
-   function Known_Alignment                       (E : Entity_Id) return B is
-      Result : constant B := not Field_Is_Initial_Zero (E, F_Alignment);
-   begin
-      return Result;
-   end Known_Alignment;
-
-   function Known_Component_Bit_Offset            (E : Entity_Id) return B is
-   begin
-      return Component_Bit_Offset (E) /= No_Uint;
-   end Known_Component_Bit_Offset;
-
-   function Known_Component_Size                  (E : Entity_Id) return B is
-   begin
-      return Component_Size (E) /= Uint_0
-        and then Component_Size (E) /= No_Uint;
-   end Known_Component_Size;
-
-   function Known_Esize                           (E : Entity_Id) return B is
-   begin
-      return Esize (E) /= Uint_0
-        and then Esize (E) /= No_Uint;
-   end Known_Esize;
-
-   function Known_Normalized_First_Bit            (E : Entity_Id) return B is
-   begin
-      return Normalized_First_Bit (E) /= No_Uint;
-   end Known_Normalized_First_Bit;
-
-   function Known_Normalized_Position             (E : Entity_Id) return B is
-   begin
-      return Normalized_Position (E) /= No_Uint;
-   end Known_Normalized_Position;
-
-   function Known_Normalized_Position_Max         (E : Entity_Id) return B is
-   begin
-      return Normalized_Position_Max (E) /= No_Uint;
-   end Known_Normalized_Position_Max;
-
-   function Known_RM_Size                         (E : Entity_Id) return B is
-   begin
-      return RM_Size (E) /= No_Uint
-        and then (RM_Size (E) /= Uint_0
-                    or else Is_Discrete_Type (E)
-                    or else Is_Fixed_Point_Type (E));
-   end Known_RM_Size;
-
-   function Known_Static_Component_Bit_Offset     (E : Entity_Id) return B is
-   begin
-      return Component_Bit_Offset (E) /= No_Uint
-        and then Component_Bit_Offset (E) >= Uint_0;
-   end Known_Static_Component_Bit_Offset;
-
-   function Known_Static_Component_Size           (E : Entity_Id) return B is
-   begin
-      return Component_Size (E) > Uint_0;
-   end Known_Static_Component_Size;
-
-   function Known_Static_Esize                    (E : Entity_Id) return B is
-   begin
-      return Esize (E) > Uint_0
-        and then not Is_Generic_Type (E);
-   end Known_Static_Esize;
-
-   function Known_Static_Normalized_First_Bit     (E : Entity_Id) return B is
-   begin
-      return Normalized_First_Bit (E) /= No_Uint
-        and then Normalized_First_Bit (E) >= Uint_0;
-   end Known_Static_Normalized_First_Bit;
-
-   function Known_Static_Normalized_Position      (E : Entity_Id) return B is
-   begin
-      return Normalized_Position (E) /= No_Uint
-        and then Normalized_Position (E) >= Uint_0;
-   end Known_Static_Normalized_Position;
-
-   function Known_Static_Normalized_Position_Max  (E : Entity_Id) return B is
-   begin
-      return Normalized_Position_Max (E) /= No_Uint
-        and then Normalized_Position_Max (E) >= Uint_0;
-   end Known_Static_Normalized_Position_Max;
-
-   function Known_Static_RM_Size                  (E : Entity_Id) return B is
-   begin
-      return (RM_Size (E) > Uint_0
-                or else Is_Discrete_Type (E)
-                or else Is_Fixed_Point_Type (E))
-        and then not Is_Generic_Type (E);
-   end Known_Static_RM_Size;
+      Reinit_Esize (Id);
+      Reinit_RM_Size (Id);
+      Reinit_Alignment (Id);
+   end Reinit_Size_Align;
 
    --------------------
    -- Address_Clause --
    --------------------
 
-   function Address_Clause (Id : E) return N is
+   function Address_Clause (Id : E) return Node_Id is
    begin
       return Get_Attribute_Definition_Clause (Id, Attribute_Address);
    end Address_Clause;
@@ -635,7 +617,7 @@ package body Einfo.Utils is
    -- Alignment_Clause --
    ----------------------
 
-   function Alignment_Clause (Id : E) return N is
+   function Alignment_Clause (Id : E) return Node_Id is
    begin
       return Get_Attribute_Definition_Clause (Id, Attribute_Alignment);
    end Alignment_Clause;
@@ -689,7 +671,7 @@ package body Einfo.Utils is
    -- Declaration_Node --
    ----------------------
 
-   function Declaration_Node (Id : E) return N is
+   function Declaration_Node (Id : E) return Node_Id is
       P : Node_Id;
 
    begin
@@ -701,16 +683,45 @@ package body Einfo.Utils is
          P := Parent (Id);
       end if;
 
+      while Nkind (P) in N_Selected_Component | N_Expanded_Name
+        or else (Nkind (P) = N_Defining_Program_Unit_Name
+                   and then Is_Child_Unit (Id))
       loop
-         if Nkind (P) in N_Selected_Component | N_Expanded_Name
-           or else (Nkind (P) = N_Defining_Program_Unit_Name
-                     and then Is_Child_Unit (Id))
-         then
-            P := Parent (P);
-         else
-            return P;
-         end if;
+         P := Parent (P);
       end loop;
+
+      if Is_Itype (Id)
+        and then Nkind (P) not in
+          N_Full_Type_Declaration | N_Subtype_Declaration
+      then
+         P := Empty;
+      end if;
+
+      --  Declarations are sometimes removed by replacing them with other
+      --  irrelevant nodes. For example, a declare expression can be turned
+      --  into a literal by constant folding. In these cases we want to
+      --  return Empty.
+
+      if Nkind (P) in
+          N_Assignment_Statement
+        | N_Integer_Literal
+        | N_Procedure_Call_Statement
+        | N_Subtype_Indication
+        | N_Type_Conversion
+      then
+         P := Empty;
+      end if;
+
+      --  The following Assert indicates what kinds of nodes can be returned;
+      --  they are not all "declarations".
+
+      if Serious_Errors_Detected = 0 then
+         pragma Assert
+           (Nkind (P) in N_Is_Decl | N_Empty,
+            "Declaration_Node incorrect kind: " & Node_Kind'Image (Nkind (P)));
+      end if;
+
+      return P;
    end Declaration_Node;
 
    ---------------------
@@ -749,7 +760,7 @@ package body Einfo.Utils is
    -- Entry_Index_Type --
    ----------------------
 
-   function Entry_Index_Type (Id : E) return N is
+   function Entry_Index_Type (Id : E) return E is
    begin
       pragma Assert (Ekind (Id) = E_Entry_Family);
       return Etype (Discrete_Subtype_Definition (Parent (Id)));
@@ -759,7 +770,7 @@ package body Einfo.Utils is
    -- First_Component --
    ---------------------
 
-   function First_Component (Id : E) return E is
+   function First_Component (Id : E) return Entity_Id is
       Comp_Id : Entity_Id;
 
    begin
@@ -781,7 +792,7 @@ package body Einfo.Utils is
    -- First_Component_Or_Discriminant --
    -------------------------------------
 
-   function First_Component_Or_Discriminant (Id : E) return E is
+   function First_Component_Or_Discriminant (Id : E) return Entity_Id is
       Comp_Id : Entity_Id;
 
    begin
@@ -804,7 +815,7 @@ package body Einfo.Utils is
    -- First_Formal --
    ------------------
 
-   function First_Formal (Id : E) return E is
+   function First_Formal (Id : E) return Entity_Id is
       Formal : Entity_Id;
 
    begin
@@ -845,7 +856,7 @@ package body Einfo.Utils is
    -- First_Formal_With_Extras --
    ------------------------------
 
-   function First_Formal_With_Extras (Id : E) return E is
+   function First_Formal_With_Extras (Id : E) return Entity_Id is
       Formal : Entity_Id;
 
    begin
@@ -1006,7 +1017,9 @@ package body Einfo.Utils is
       --  Contract / subprogram variant / test case pragmas
 
       Is_CTC : constant Boolean :=
+                  Id = Pragma_Always_Terminates         or else
                   Id = Pragma_Contract_Cases            or else
+                  Id = Pragma_Exceptional_Cases         or else
                   Id = Pragma_Subprogram_Variant        or else
                   Id = Pragma_Test_Case;
 
@@ -1371,7 +1384,7 @@ package body Einfo.Utils is
    -- Invariant_Procedure --
    -------------------------
 
-   function Invariant_Procedure (Id : E) return E is
+   function Invariant_Procedure (Id : E) return Entity_Id is
       Subp_Elmt : Elmt_Id;
       Subp_Id   : Entity_Id;
       Subps     : Elist_Id;
@@ -1471,26 +1484,19 @@ package body Einfo.Utils is
 
    function Is_Dynamic_Scope (Id : E) return B is
    begin
-      return
-        Ekind (Id) = E_Block
+      return Ekind (Id) in E_Block
+      --  Including an E_Block that came from an N_Expression_With_Actions
+                         | E_Entry
+                         | E_Entry_Family
+                         | E_Function
+                         | E_Procedure
+                         | E_Return_Statement
+                         | E_Subprogram_Body
+                         | E_Task_Type
           or else
-        Ekind (Id) = E_Function
-          or else
-        Ekind (Id) = E_Procedure
-          or else
-        Ekind (Id) = E_Subprogram_Body
-          or else
-        Ekind (Id) = E_Task_Type
-          or else
-       (Ekind (Id) = E_Limited_Private_Type
-         and then Present (Full_View (Id))
-         and then Ekind (Full_View (Id)) = E_Task_Type)
-          or else
-        Ekind (Id) = E_Entry
-          or else
-        Ekind (Id) = E_Entry_Family
-          or else
-        Ekind (Id) = E_Return_Statement;
+        (Ekind (Id) = E_Limited_Private_Type
+          and then Present (Full_View (Id))
+          and then Ekind (Full_View (Id)) = E_Task_Type);
    end Is_Dynamic_Scope;
 
    --------------------
@@ -1501,11 +1507,10 @@ package body Einfo.Utils is
       Kind : constant Node_Kind := Nkind (N);
 
    begin
-      --  Identifiers, operator symbols, expanded names are entity names
+      --  Identifiers, operator symbols, expanded names are entity names.
+      --  (But not N_Character_Literal.)
 
-      return Kind = N_Identifier
-        or else Kind = N_Operator_Symbol
-        or else Kind = N_Expanded_Name
+      return Kind in N_Identifier | N_Operator_Symbol | N_Expanded_Name
 
       --  Attribute references are entity names if they refer to an entity.
       --  Note that we don't do this by testing for the presence of the
@@ -1520,7 +1525,7 @@ package body Einfo.Utils is
    -- Is_Elaboration_Target --
    ---------------------------
 
-   function Is_Elaboration_Target (Id : Entity_Id) return Boolean is
+   function Is_Elaboration_Target (Id : E) return Boolean is
    begin
       return
         Ekind (Id) in E_Constant | E_Package | E_Variable
@@ -1763,7 +1768,7 @@ package body Einfo.Utils is
    -- Last_Formal --
    -----------------
 
-   function Last_Formal (Id : E) return E is
+   function Last_Formal (Id : E) return Entity_Id is
       Formal : Entity_Id;
 
    begin
@@ -1793,7 +1798,7 @@ package body Einfo.Utils is
    -- Link_Entities --
    -------------------
 
-   procedure Link_Entities (First : Entity_Id; Second : Node_Id) is
+   procedure Link_Entities (First, Second : Entity_Id) is
    begin
       if Present (Second) then
          Set_Prev_Entity (Second, First);  --  First <-- Second
@@ -1906,7 +1911,7 @@ package body Einfo.Utils is
    -- Next_Component --
    --------------------
 
-   function Next_Component (Id : E) return E is
+   function Next_Component (Id : E) return Entity_Id is
       Comp_Id : Entity_Id;
 
    begin
@@ -1923,7 +1928,7 @@ package body Einfo.Utils is
    -- Next_Component_Or_Discriminant --
    ------------------------------------
 
-   function Next_Component_Or_Discriminant (Id : E) return E is
+   function Next_Component_Or_Discriminant (Id : E) return Entity_Id is
       Comp_Id : Entity_Id;
 
    begin
@@ -1944,7 +1949,7 @@ package body Einfo.Utils is
    --  Next_Stored_Discriminant by making sure that the Discriminant
    --  returned is of the same variety as Id.
 
-   function Next_Discriminant (Id : E) return E is
+   function Next_Discriminant (Id : E) return Entity_Id is
 
       --  Derived Tagged types with private extensions look like this...
 
@@ -1957,7 +1962,7 @@ package body Einfo.Utils is
 
       --  so it is critical not to go past the leading discriminants
 
-      D : E := Id;
+      D : Entity_Id := Id;
 
    begin
       pragma Assert (Ekind (Id) = E_Discriminant);
@@ -1972,7 +1977,7 @@ package body Einfo.Utils is
          end if;
 
          exit when Ekind (D) = E_Discriminant
-           and then (Is_Completely_Hidden (D) = Is_Completely_Hidden (Id));
+           and then Is_Completely_Hidden (D) = Is_Completely_Hidden (Id);
       end loop;
 
       return D;
@@ -1982,7 +1987,7 @@ package body Einfo.Utils is
    -- Next_Formal --
    -----------------
 
-   function Next_Formal (Id : E) return E is
+   function Next_Formal (Id : E) return Entity_Id is
       P : Entity_Id;
 
    begin
@@ -2007,7 +2012,7 @@ package body Einfo.Utils is
    -- Next_Formal_With_Extras --
    -----------------------------
 
-   function Next_Formal_With_Extras (Id : E) return E is
+   function Next_Formal_With_Extras (Id : E) return Entity_Id is
    begin
       if Present (Extra_Formal (Id)) then
          return Extra_Formal (Id);
@@ -2020,8 +2025,10 @@ package body Einfo.Utils is
    -- Next_Index --
    ----------------
 
-   function Next_Index (Id : Node_Id) return Node_Id is
+   function Next_Index (Id : N) return Node_Id is
    begin
+      pragma Assert (Nkind (Id) in N_Is_Index);
+      pragma Assert (No (Next (Id)) or else Nkind (Next (Id)) in N_Is_Index);
       return Next (Id);
    end Next_Index;
 
@@ -2029,7 +2036,7 @@ package body Einfo.Utils is
    -- Next_Literal --
    ------------------
 
-   function Next_Literal (Id : E) return E is
+   function Next_Literal (Id : E) return Entity_Id is
    begin
       pragma Assert (Nkind (Id) in N_Entity);
       return Next (Id);
@@ -2039,7 +2046,7 @@ package body Einfo.Utils is
    -- Next_Stored_Discriminant --
    ------------------------------
 
-   function Next_Stored_Discriminant (Id : E) return E is
+   function Next_Stored_Discriminant (Id : E) return Entity_Id is
    begin
       --  See comment in Next_Discriminant
 
@@ -2075,7 +2082,7 @@ package body Einfo.Utils is
    --------------------
 
    function Number_Entries (Id : E) return Nat is
-      N   : Int;
+      N   : Nat;
       Ent : Entity_Id;
 
    begin
@@ -2098,8 +2105,8 @@ package body Einfo.Utils is
    -- Number_Formals --
    --------------------
 
-   function Number_Formals (Id : E) return Pos is
-      N      : Int;
+   function Number_Formals (Id : E) return Nat is
+      N      : Nat;
       Formal : Entity_Id;
 
    begin
@@ -2117,7 +2124,7 @@ package body Einfo.Utils is
    -- Object_Size_Clause --
    ------------------------
 
-   function Object_Size_Clause (Id : E) return N is
+   function Object_Size_Clause (Id : E) return Node_Id is
    begin
       return Get_Attribute_Definition_Clause (Id, Attribute_Object_Size);
    end Object_Size_Clause;
@@ -2135,7 +2142,7 @@ package body Einfo.Utils is
    -- DIC_Procedure --
    -------------------
 
-   function DIC_Procedure (Id : E) return E is
+   function DIC_Procedure (Id : E) return Entity_Id is
       Subp_Elmt : Elmt_Id;
       Subp_Id   : Entity_Id;
       Subps     : Elist_Id;
@@ -2167,7 +2174,7 @@ package body Einfo.Utils is
       return Empty;
    end DIC_Procedure;
 
-   function Partial_DIC_Procedure (Id : E) return E is
+   function Partial_DIC_Procedure (Id : E) return Entity_Id is
       Subp_Elmt : Elmt_Id;
       Subp_Id   : Entity_Id;
       Subps     : Elist_Id;
@@ -2220,7 +2227,7 @@ package body Einfo.Utils is
    -- Partial_Invariant_Procedure --
    ---------------------------------
 
-   function Partial_Invariant_Procedure (Id : E) return E is
+   function Partial_Invariant_Procedure (Id : E) return Entity_Id is
       Subp_Elmt : Elmt_Id;
       Subp_Id   : Entity_Id;
       Subps     : Elist_Id;
@@ -2333,7 +2340,7 @@ package body Einfo.Utils is
    -- Predicate_Function --
    ------------------------
 
-   function Predicate_Function (Id : E) return E is
+   function Predicate_Function (Id : E) return Entity_Id is
       Subp_Elmt : Elmt_Id;
       Subp_Id   : Entity_Id;
       Subps     : Elist_Id;
@@ -2382,53 +2389,6 @@ package body Einfo.Utils is
 
       return Empty;
    end Predicate_Function;
-
-   --------------------------
-   -- Predicate_Function_M --
-   --------------------------
-
-   function Predicate_Function_M (Id : E) return E is
-      Subp_Elmt : Elmt_Id;
-      Subp_Id   : Entity_Id;
-      Subps     : Elist_Id;
-      Typ       : Entity_Id;
-
-   begin
-      pragma Assert (Is_Type (Id));
-
-      --  If type is private and has a completion, predicate may be defined on
-      --  the full view.
-
-      if Is_Private_Type (Id)
-         and then
-           (not Has_Predicates (Id) or else No (Subprograms_For_Type (Id)))
-         and then Present (Full_View (Id))
-      then
-         Typ := Full_View (Id);
-
-      else
-         Typ := Id;
-      end if;
-
-      Subps := Subprograms_For_Type (Typ);
-
-      if Present (Subps) then
-         Subp_Elmt := First_Elmt (Subps);
-         while Present (Subp_Elmt) loop
-            Subp_Id := Node (Subp_Elmt);
-
-            if Ekind (Subp_Id) = E_Function
-              and then Is_Predicate_Function_M (Subp_Id)
-            then
-               return Subp_Id;
-            end if;
-
-            Next_Elmt (Subp_Elmt);
-         end loop;
-      end if;
-
-      return Empty;
-   end Predicate_Function_M;
 
    -------------------------
    -- Present_In_Rep_Item --
@@ -2513,11 +2473,13 @@ package body Einfo.Utils is
 
       elsif Id = First then
          Set_First_Entity (Scop, Next);
+         Set_Prev_Entity (Next, Empty);  --  Empty <-- First_Entity
 
       --  The eliminated entity was the tail of the entity chain
 
       elsif Id = Last then
          Set_Last_Entity (Scop, Prev);
+         Set_Next_Entity (Prev, Empty);  --  Last_Entity --> Empty
 
       --  Otherwise the eliminated entity comes from the middle of the entity
       --  chain.
@@ -2639,6 +2601,16 @@ package body Einfo.Utils is
       return Scope_Depth_Value (Scop);
    end Scope_Depth;
 
+   function Scope_Depth_Default_0 (Id : E) return U is
+   begin
+      if Scope_Depth_Set (Id) then
+         return Scope_Depth (Id);
+
+      else
+         return Uint_0;
+      end if;
+   end Scope_Depth_Default_0;
+
    ---------------------
    -- Scope_Depth_Set --
    ---------------------
@@ -2687,7 +2659,7 @@ package body Einfo.Utils is
                             | E_Anonymous_Access_Subprogram_Type
               and then not Has_Convention_Pragma (Typ)
             then
-               Set_Basic_Convention (Typ, Val);
+               Set_Convention (Typ, Val);
                Set_Has_Convention_Pragma (Typ);
 
                --  And for the access subprogram type, deal similarly with the
@@ -2697,10 +2669,9 @@ package body Einfo.Utils is
                   declare
                      Dtype : constant Entity_Id := Designated_Type (Typ);
                   begin
-                     if Ekind (Dtype) = E_Subprogram_Type
-                       and then not Has_Convention_Pragma (Dtype)
-                     then
-                        Set_Basic_Convention (Dtype, Val);
+                     if Ekind (Dtype) = E_Subprogram_Type then
+                        pragma Assert (not Has_Convention_Pragma (Dtype));
+                        Set_Convention (Dtype, Val);
                         Set_Has_Convention_Pragma (Dtype);
                      end if;
                   end;
@@ -2860,49 +2831,12 @@ package body Einfo.Utils is
       end loop;
    end Set_Predicate_Function;
 
-   ------------------------------
-   -- Set_Predicate_Function_M --
-   ------------------------------
-
-   procedure Set_Predicate_Function_M (Id : E; V : E) is
-      Subp_Elmt : Elmt_Id;
-      Subp_Id   : Entity_Id;
-      Subps     : Elist_Id;
-
-   begin
-      pragma Assert (Is_Type (Id) and then Has_Predicates (Id));
-
-      Subps := Subprograms_For_Type (Id);
-
-      if No (Subps) then
-         Subps := New_Elmt_List;
-         Set_Subprograms_For_Type (Id, Subps);
-      end if;
-
-      Subp_Elmt := First_Elmt (Subps);
-      Prepend_Elmt (V, Subps);
-
-      --  Check for a duplicate predication function
-
-      while Present (Subp_Elmt) loop
-         Subp_Id := Node (Subp_Elmt);
-
-         if Ekind (Subp_Id) = E_Function
-           and then Is_Predicate_Function_M (Subp_Id)
-         then
-            raise Program_Error;
-         end if;
-
-         Next_Elmt (Subp_Elmt);
-      end loop;
-   end Set_Predicate_Function_M;
-
    -----------------
    -- Size_Clause --
    -----------------
 
-   function Size_Clause (Id : E) return N is
-      Result : N := Get_Attribute_Definition_Clause (Id, Attribute_Size);
+   function Size_Clause (Id : E) return Node_Id is
+      Result : Node_Id := Get_Attribute_Definition_Clause (Id, Attribute_Size);
    begin
       if No (Result) then
          Result := Get_Attribute_Definition_Clause (Id, Attribute_Value_Size);
@@ -3004,7 +2938,7 @@ package body Einfo.Utils is
    -- Type_High_Bound --
    ---------------------
 
-   function Type_High_Bound (Id : E) return Node_Id is
+   function Type_High_Bound (Id : E) return N is
       Rng : constant Node_Id := Scalar_Range (Id);
    begin
       if Nkind (Rng) = N_Subtype_Indication then
@@ -3018,7 +2952,7 @@ package body Einfo.Utils is
    -- Type_Low_Bound --
    --------------------
 
-   function Type_Low_Bound (Id : E) return Node_Id is
+   function Type_Low_Bound (Id : E) return N is
       Rng : constant Node_Id := Scalar_Range (Id);
    begin
       if Nkind (Rng) = N_Subtype_Indication then
@@ -3032,7 +2966,7 @@ package body Einfo.Utils is
    -- Underlying_Type --
    ---------------------
 
-   function Underlying_Type (Id : E) return E is
+   function Underlying_Type (Id : E) return Entity_Id is
    begin
       --  For record_with_private the underlying type is always the direct full
       --  view. Never try to take the full view of the parent it does not make
@@ -3085,7 +3019,7 @@ package body Einfo.Utils is
          --  Otherwise check for the case where we have a derived type or
          --  subtype, and if so get the Underlying_Type of the parent type.
 
-         elsif Etype (Id) /= Id then
+         elsif Present (Etype (Id)) and then Etype (Id) /= Id then
             return Underlying_Type (Etype (Id));
 
          --  Otherwise we have an incomplete or private type that has no full
@@ -3238,7 +3172,7 @@ package body Einfo.Utils is
                Index := First_Index (Id);
                while Present (Index) loop
                   Write_Attribute (" ", Etype (Index));
-                  Index := Next_Index (Index);
+                  Next_Index (Index);
                end loop;
 
                Write_Eol;
@@ -3279,53 +3213,49 @@ package body Einfo.Utils is
    -- Iterator Procedures --
    -------------------------
 
-   procedure Proc_Next_Component                 (N : in out Node_Id) is
+   procedure Next_Component                 (N : in out Node_Id) is
    begin
       N := Next_Component (N);
-   end Proc_Next_Component;
+   end Next_Component;
 
-   procedure Proc_Next_Component_Or_Discriminant (N : in out Node_Id) is
+   procedure Next_Component_Or_Discriminant (N : in out Node_Id) is
    begin
-      N := Next_Entity (N);
-      while Present (N) loop
-         exit when Ekind (N) in E_Component | E_Discriminant;
-         N := Next_Entity (N);
-      end loop;
-   end Proc_Next_Component_Or_Discriminant;
+      N := Next_Component_Or_Discriminant (N);
+   end Next_Component_Or_Discriminant;
 
-   procedure Proc_Next_Discriminant              (N : in out Node_Id) is
+   procedure Next_Discriminant              (N : in out Node_Id) is
    begin
       N := Next_Discriminant (N);
-   end Proc_Next_Discriminant;
+   end Next_Discriminant;
 
-   procedure Proc_Next_Formal                    (N : in out Node_Id) is
+   procedure Next_Formal                    (N : in out Node_Id) is
    begin
       N := Next_Formal (N);
-   end Proc_Next_Formal;
+   end Next_Formal;
 
-   procedure Proc_Next_Formal_With_Extras        (N : in out Node_Id) is
+   procedure Next_Formal_With_Extras        (N : in out Node_Id) is
    begin
       N := Next_Formal_With_Extras (N);
-   end Proc_Next_Formal_With_Extras;
+   end Next_Formal_With_Extras;
 
-   procedure Proc_Next_Index                     (N : in out Node_Id) is
+   procedure Next_Index                     (N : in out Node_Id) is
    begin
       N := Next_Index (N);
-   end Proc_Next_Index;
+   end Next_Index;
 
-   procedure Proc_Next_Inlined_Subprogram        (N : in out Node_Id) is
+   procedure Next_Inlined_Subprogram        (N : in out Node_Id) is
    begin
       N := Next_Inlined_Subprogram (N);
-   end Proc_Next_Inlined_Subprogram;
+   end Next_Inlined_Subprogram;
 
-   procedure Proc_Next_Literal                   (N : in out Node_Id) is
+   procedure Next_Literal                   (N : in out Node_Id) is
    begin
       N := Next_Literal (N);
-   end Proc_Next_Literal;
+   end Next_Literal;
 
-   procedure Proc_Next_Stored_Discriminant       (N : in out Node_Id) is
+   procedure Next_Stored_Discriminant       (N : in out Node_Id) is
    begin
       N := Next_Stored_Discriminant (N);
-   end Proc_Next_Stored_Discriminant;
+   end Next_Stored_Discriminant;
 
 end Einfo.Utils;

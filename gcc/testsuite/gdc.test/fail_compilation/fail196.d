@@ -1,23 +1,26 @@
 /*
 TEST_OUTPUT:
 ---
-fail_compilation/fail196.d(26): Error: delimited string must end in )"
-fail_compilation/fail196.d(26): Error: Implicit string concatenation is error-prone and disallowed in D
-fail_compilation/fail196.d(26):        Use the explicit syntax instead (concatenating literals is `@nogc`): "foo(xxx)" ~ ";\x0a    assert(s == "
-fail_compilation/fail196.d(27): Error: semicolon expected, not `foo`
-fail_compilation/fail196.d(27): Error: found `");\x0a\x0a    s = q"` when expecting `;` following statement
-fail_compilation/fail196.d(29): Error: found `";\x0a    assert(s == "` when expecting `;` following statement
-fail_compilation/fail196.d(30): Error: found `");\x0a\x0a    s = q"` when expecting `;` following statement
-fail_compilation/fail196.d(32): Error: found `{` when expecting `;` following statement
-fail_compilation/fail196.d(32): Error: found `}` when expecting `;` following statement
-fail_compilation/fail196.d(33): Error: found `foo` when expecting `;` following statement
-fail_compilation/fail196.d(33): Error: found `}` when expecting `;` following statement
-fail_compilation/fail196.d(35): Error: found `<` when expecting `;` following statement
-fail_compilation/fail196.d(36): Error: found `foo` when expecting `;` following statement
-fail_compilation/fail196.d(36): Error: found `<` instead of statement
-fail_compilation/fail196.d(42): Error: unterminated string constant starting at fail_compilation/fail196.d(42)
-fail_compilation/fail196.d(44): Error: found `End of File` when expecting `}` following compound statement
-fail_compilation/fail196.d(44): Error: found `End of File` when expecting `}` following compound statement
+fail_compilation/fail196.d(29): Error: delimited string must end in `)"`
+fail_compilation/fail196.d(29): Error: implicit string concatenation is error-prone and disallowed in D
+fail_compilation/fail196.d(29):        Use the explicit syntax instead (concatenating literals is `@nogc`): "foo(xxx)" ~ ";\n    assert(s == "
+fail_compilation/fail196.d(30): Error: semicolon needed to end declaration of `s`, instead of `foo`
+fail_compilation/fail196.d(29):        `s` declared here
+fail_compilation/fail196.d(30): Error: found `");\n\n    s = q"` when expecting `;` following statement `foo(xxx)` on line fail_compilation/fail196.d(30)
+fail_compilation/fail196.d(32): Error: found `";\n    assert(s == "` when expecting `;` following statement `[foo[xxx]]` on line fail_compilation/fail196.d(32)
+fail_compilation/fail196.d(33): Error: found `");\n\n    s = q"` when expecting `;` following statement `foo[xxx]` on line fail_compilation/fail196.d(33)
+fail_compilation/fail196.d(35): Error: found `{` when expecting `;` following statement `foo` on line fail_compilation/fail196.d(35)
+fail_compilation/fail196.d(35): Error: found `}` when expecting `;` following statement `xxx` on line fail_compilation/fail196.d(35)
+fail_compilation/fail196.d(36): Error: found `foo` when expecting `;` following statement `";\n    assert(s == "` on line fail_compilation/fail196.d(35)
+fail_compilation/fail196.d(36): Error: found `}` when expecting `;` following statement `xxx` on line fail_compilation/fail196.d(36)
+fail_compilation/fail196.d(38): Error: found `<` when expecting `;` following statement `");\n\n    s = q" < foo` on line fail_compilation/fail196.d(36)
+fail_compilation/fail196.d(39): Error: found `foo` when expecting `;` following statement `xxx >> ";\n    assert(s == "` on line fail_compilation/fail196.d(38)
+fail_compilation/fail196.d(39): Error: found `<` instead of statement
+fail_compilation/fail196.d(45): Error: unterminated string constant starting at fail_compilation/fail196.d(45)
+fail_compilation/fail196.d(47): Error: matching `}` expected following compound statement, not `End of File`
+fail_compilation/fail196.d(36):        unmatched `{`
+fail_compilation/fail196.d(47): Error: matching `}` expected following compound statement, not `End of File`
+fail_compilation/fail196.d(28):        unmatched `{`
 ---
 */
 

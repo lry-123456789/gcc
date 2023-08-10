@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2010-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2010-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -41,20 +41,20 @@ package body Aspects is
    --  type. False means it is not inherited.
 
    Base_Aspect : constant array (Aspect_Id) of Boolean :=
-     (Aspect_Atomic                  => True,
-      Aspect_Atomic_Components       => True,
-      Aspect_Constant_Indexing       => True,
-      Aspect_Default_Iterator        => True,
-      Aspect_Discard_Names           => True,
-      Aspect_Independent_Components  => True,
-      Aspect_Iterator_Element        => True,
-      Aspect_Stable_Properties       => True,
-      Aspect_Type_Invariant          => True,
-      Aspect_Unchecked_Union         => True,
-      Aspect_Variable_Indexing       => True,
-      Aspect_Volatile                => True,
-      Aspect_Volatile_Full_Access    => True,
-      others                         => False);
+     (Aspect_Atomic                 => True,
+      Aspect_Atomic_Components      => True,
+      Aspect_Constant_Indexing      => True,
+      Aspect_Default_Iterator       => True,
+      Aspect_Discard_Names          => True,
+      Aspect_Independent_Components => True,
+      Aspect_Iterator_Element       => True,
+      Aspect_Stable_Properties      => True,
+      Aspect_Type_Invariant         => True,
+      Aspect_Unchecked_Union        => True,
+      Aspect_Variable_Indexing      => True,
+      Aspect_Volatile               => True,
+      Aspect_Volatile_Full_Access   => True,
+      others                        => False);
 
    --  The following array indicates type aspects that are inherited and apply
    --  to the class-wide type as well.
@@ -193,13 +193,14 @@ package body Aspects is
    function Find_Aspect
      (Id            : Entity_Id;
       A             : Aspect_Id;
-      Class_Present : Boolean := False) return Node_Id
+      Class_Present : Boolean := False;
+      Or_Rep_Item   : Boolean := False) return Node_Id
    is
-      Decl  : Node_Id;
-      Item  : Node_Id;
-      Owner : Entity_Id;
-      Spec  : Node_Id;
-
+      Decl                 : Node_Id;
+      Item                 : Node_Id;
+      Owner                : Entity_Id;
+      Spec                 : Node_Id;
+      Alternative_Rep_Item : Node_Id := Empty;
    begin
       Owner := Id;
 
@@ -231,6 +232,18 @@ package body Aspects is
            and then Class_Present = Sinfo.Nodes.Class_Present (Item)
          then
             return Item;
+
+         --  We could do something similar here for an N_Pragma node
+         --  when Get_Aspect_Id (Pragma_Name (Item)) = A, but let's
+         --  wait for a demonstrated need.
+
+         elsif Or_Rep_Item
+           and then not Class_Present
+           and then Nkind (Item) = N_Attribute_Definition_Clause
+           and then Get_Aspect_Id (Chars (Item)) = A
+         then
+            --  Remember this candidate in case we don't find anything better
+            Alternative_Rep_Item := Item;
          end if;
 
          Next_Rep_Item (Item);
@@ -266,9 +279,10 @@ package body Aspects is
       end if;
 
       --  The entity does not carry any aspects or the desired aspect was not
-      --  found.
+      --  found. We have no N_Aspect_Specification node to return, but
+      --  Alternative_Rep_Item may have been set (if Or_Rep_Item is True).
 
-      return Empty;
+      return Alternative_Rep_Item;
    end Find_Aspect;
 
    --------------------------
@@ -285,7 +299,9 @@ package body Aspects is
 
    begin
       if Present (Spec) then
-         if A = Aspect_Default_Iterator then
+         if A = Aspect_Default_Iterator
+           and then Present (Aspect_Rep_Item (Spec))
+         then
             return Expression (Aspect_Rep_Item (Spec));
          else
             return Expression (Spec);
@@ -322,6 +338,16 @@ package body Aspects is
    begin
       return Present (Find_Aspect (Id, A, Class_Present => Class_Present));
    end Has_Aspect;
+
+   ------------------
+   -- Is_Aspect_Id --
+   ------------------
+
+   function Is_Aspect_Id (Aspect : Name_Id) return Boolean is
+     (Get_Aspect_Id (Aspect) /= No_Aspect);
+
+   function Is_Aspect_Id (Aspect : Node_Id) return Boolean is
+     (Get_Aspect_Id (Aspect) /= No_Aspect);
 
    ------------------
    -- Move_Aspects --
@@ -361,7 +387,6 @@ package body Aspects is
          else
             Asps := New_List;
             Set_Aspect_Specifications (To, Asps);
-            Set_Has_Aspects (To);
          end if;
 
          --  Remove the aspect from its original owner and relocate it to node
@@ -531,6 +556,7 @@ package body Aspects is
       --  ...except for these:
 
       Result (Aspect_Dynamic_Predicate)  := Aspect_Predicate;
+      Result (Aspect_Ghost_Predicate)    := Aspect_Predicate;
       Result (Aspect_Inline_Always)      := Aspect_Inline;
       Result (Aspect_Interrupt_Priority) := Aspect_Priority;
       Result (Aspect_Postcondition)      := Aspect_Post;

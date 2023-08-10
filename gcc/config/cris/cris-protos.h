@@ -1,5 +1,5 @@
 /* Definitions for GCC.  Part of the machine description for CRIS.
-   Copyright (C) 1998-2021 Free Software Foundation, Inc.
+   Copyright (C) 1998-2023 Free Software Foundation, Inc.
    Contributed by Axis Communications.
 
 This file is part of GCC.
@@ -20,6 +20,8 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Prototypes for the CRIS port.  */
 
+#include "tree.h" /* For ERROR_MARK.  */
+
 extern bool cris_simple_epilogue (void);
 #ifdef RTX_CODE
 extern const char *cris_op_str (rtx);
@@ -34,7 +36,8 @@ extern bool cris_base_or_autoincr_p (const_rtx, bool);
 extern bool cris_bdap_index_p (const_rtx, bool);
 extern void cris_reduce_compare (rtx *, rtx *, rtx *);
 extern bool cris_biap_index_p (const_rtx, bool);
-extern bool cris_legitimate_address_p (machine_mode, rtx, bool);
+extern bool cris_legitimate_address_p (machine_mode, rtx, bool,
+				       code_helper = ERROR_MARK);
 extern bool cris_store_multiple_op_p (rtx);
 extern bool cris_movem_load_rest_p (rtx);
 extern void cris_asm_output_symbol_ref (FILE *, rtx);
@@ -44,6 +47,12 @@ extern rtx cris_emit_movem_store (rtx, rtx, int, bool);
 extern rtx_insn *cris_emit_insn (rtx x);
 extern void cris_order_for_addsi3 (rtx *, int);
 extern void cris_emit_trap_for_misalignment (rtx);
+extern int cris_split_constant (HOST_WIDE_INT, enum rtx_code,
+				machine_mode, bool,
+				bool generate = false,
+				rtx dest = NULL_RTX,
+				rtx op = NULL_RTX);
+#define cris_splittable_constant_p cris_split_constant
 #endif /* RTX_CODE */
 extern void cris_asm_output_label_ref (FILE *, char *);
 extern void cris_asm_output_ident (const char *);
