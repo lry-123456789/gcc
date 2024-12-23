@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 2022-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 2022-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -29,8 +29,10 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
---  This package contains the specification entities using for the formal
---  verification of the routines for scanning modular Unsigned values.
+--  This package is part of a set of Ghost code packages used to proof the
+--  implementations of the Image and Value attributes. It provides the
+--  specification entities using for the formal verification of the routines
+--  for scanning modular unsigned integer values.
 
 --  Preconditions in this unit are meant for analysis only, not for run-time
 --  checking, so that the expected exceptions are raised. This is enforced by
@@ -68,6 +70,8 @@ is
         when others => raise Program_Error)
    with Ghost;
 
+   pragma Annotate (Gnatcheck, Exempt_On, "Discriminated_Records",
+                    "variant record only used in proof code");
    type Uns_Option (Overflow : Boolean := False) is record
       case Overflow is
          when True =>
@@ -76,6 +80,7 @@ is
             Value : Uns := 0;
       end case;
    end record;
+   pragma Annotate (Gnatcheck, Exempt_Off, "Discriminated_Records");
 
    function Wrap_Option (Value : Uns) return Uns_Option is
      (Overflow => False, Value => Value);

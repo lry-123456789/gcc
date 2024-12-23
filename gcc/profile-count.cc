@@ -1,5 +1,5 @@
 /* Profile counter container type.
-   Copyright (C) 2017-2023 Free Software Foundation, Inc.
+   Copyright (C) 2017-2024 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -84,32 +84,22 @@ const char *profile_quality_display_names[] =
   "precise"
 };
 
-/* Dump THIS to BUFFER.  */
-
-void
-profile_count::dump (char *buffer, struct function *fun) const
-{
-  if (!initialized_p ())
-    sprintf (buffer, "uninitialized");
-  else if (fun && initialized_p ()
-	   && fun->cfg
-	   && ENTRY_BLOCK_PTR_FOR_FN (fun)->count.initialized_p ())
-    sprintf (buffer, "%" PRId64 " (%s, freq %.4f)", m_val,
-	     profile_quality_display_names[m_quality],
-	     to_sreal_scale (ENTRY_BLOCK_PTR_FOR_FN (fun)->count).to_double ());
-  else
-    sprintf (buffer, "%" PRId64 " (%s)", m_val,
-	     profile_quality_display_names[m_quality]);
-}
-
 /* Dump THIS to F.  */
 
 void
 profile_count::dump (FILE *f, struct function *fun) const
 {
-  char buffer[64];
-  dump (buffer, fun);
-  fputs (buffer, f);
+  if (!initialized_p ())
+    fprintf (f, "uninitialized");
+  else if (fun && initialized_p ()
+	   && fun->cfg
+	   && ENTRY_BLOCK_PTR_FOR_FN (fun)->count.initialized_p ())
+    fprintf (f, "%" PRId64 " (%s, freq %.4f)", m_val,
+	     profile_quality_display_names[m_quality],
+	     to_sreal_scale (ENTRY_BLOCK_PTR_FOR_FN (fun)->count).to_double ());
+  else
+    fprintf (f, "%" PRId64 " (%s)", m_val,
+	     profile_quality_display_names[m_quality]);
 }
 
 /* Dump THIS to stderr.  */
@@ -128,13 +118,14 @@ profile_count::differs_from_p (profile_count other) const
 {
   gcc_checking_assert (compatible_p (other));
   if (!initialized_p () || !other.initialized_p ())
-    return false;
+    return initialized_p () != other.initialized_p ();
   if ((uint64_t)m_val - (uint64_t)other.m_val < 100
       || (uint64_t)other.m_val - (uint64_t)m_val < 100)
     return false;
   if (!other.m_val)
     return true;
-  int64_t ratio = (int64_t)m_val * 100 / other.m_val;
+  uint64_t ratio;
+  safe_scale_64bit (m_val, 100, other.m_val, &ratio);
   return ratio < 99 || ratio > 101;
 }
 

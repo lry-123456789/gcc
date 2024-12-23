@@ -1,5 +1,5 @@
 /* Helper class for handling a call with specific arguments.
-   Copyright (C) 2020-2023 Free Software Foundation, Inc.
+   Copyright (C) 2020-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
+#define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
@@ -34,8 +34,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-pretty-print.h"
 #include "analyzer/region-model.h"
 #include "analyzer/call-details.h"
+#include "analyzer/ranges.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "make-unique.h"
+#include "diagnostic-format-sarif.h"
 
 #if ENABLE_ANALYZER
 
@@ -56,6 +59,16 @@ call_details::call_details (const gcall *call, region_model *model,
       m_lhs_region = model->get_lvalue (lhs, ctxt);
       m_lhs_type = TREE_TYPE (lhs);
     }
+}
+
+/* call_details's ctor: copy CD, but override the context,
+   using CTXT instead.  */
+
+call_details::call_details (const call_details &cd,
+			    region_model_context *ctxt)
+{
+  *this = cd;
+  m_ctxt = ctxt;
 }
 
 /* Get the manager from m_model.  */
@@ -283,6 +296,17 @@ call_details::get_arg_svalue (unsigned idx) const
   return m_model->get_rvalue (arg, m_ctxt);
 }
 
+/* If argument IDX's svalue at the callsite is of pointer type,
+   return the region it points to.
+   Otherwise return NULL.  */
+
+const region *
+call_details::deref_ptr_arg (unsigned idx) const
+{
+  const svalue *ptr_sval = get_arg_svalue (idx);
+  return m_model->deref_rvalue (ptr_sval, get_arg_tree (idx), m_ctxt);
+}
+
 /* Attempt to get the string literal for argument IDX, or return NULL
    otherwise.
    For use when implementing "__analyzer_*" functions that take
@@ -338,12 +362,8 @@ call_details::dump_to_pp (pretty_printer *pp, bool simple) const
 DEBUG_FUNCTION void
 call_details::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.buffer->stream = stderr;
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple);
-  pp_flush (&pp);
 }
 
 /* Get a conjured_svalue for this call for REG,
@@ -374,6 +394,156 @@ call_details::lookup_function_attribute (const char *attr_name) const
     return NULL_TREE;
 
   return lookup_attribute (attr_name, TYPE_ATTRIBUTES (allocfntype));
+}
+
+void
+call_details::check_for_null_terminated_string_arg (unsigned arg_idx) const
+{
+  check_for_null_terminated_string_arg (arg_idx, false, nullptr);
+}
+
+const svalue *
+call_details::
+check_for_null_terminated_string_arg (unsigned arg_idx,
+				      bool include_terminator,
+				      const svalue **out_sval) const
+{
+  region_model *model = get_model ();
+  return model->check_for_null_terminated_string_arg (*this,
+						      arg_idx,
+						      include_terminator,
+						      out_sval);
+}
+
+/* A subclass of pending_diagnostic for complaining about overlapping
+   buffers.  */
+
+class overlapping_buffers
+: public pending_diagnostic_subclass<overlapping_buffers>
+{
+public:
+  overlapping_buffers (tree fndecl,
+		       const symbolic_byte_range &byte_range_a,
+		       const symbolic_byte_range &byte_range_b,
+		       const svalue *num_bytes_read_sval)
+  : m_fndecl (fndecl),
+    m_byte_range_a (byte_range_a),
+    m_byte_range_b (byte_range_b),
+    m_num_bytes_read_sval (num_bytes_read_sval)
+  {
+  }
+
+  const char *get_kind () const final override
+  {
+    return "overlapping_buffers";
+  }
+
+  bool operator== (const overlapping_buffers &other) const
+  {
+    return m_fndecl == other.m_fndecl;
+  }
+
+  int get_controlling_option () const final override
+  {
+    return OPT_Wanalyzer_overlapping_buffers;
+  }
+
+  bool emit (diagnostic_emission_context &ctxt) final override
+  {
+    auto_diagnostic_group d;
+
+    bool warned = ctxt.warn ("overlapping buffers passed as arguments to %qD",
+			     m_fndecl);
+
+    // TODO: draw a picture?
+
+    if (warned)
+      inform (DECL_SOURCE_LOCATION (m_fndecl),
+	      "the behavior of %qD is undefined for overlapping buffers",
+	      m_fndecl);
+
+    return warned;
+  }
+
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &) final override
+  {
+    pp_printf (&pp,
+	       "overlapping buffers passed as arguments to %qD",
+	       m_fndecl);
+    return true;
+  }
+
+  void maybe_add_sarif_properties (sarif_object &result_obj)
+    const final override
+  {
+    sarif_property_bag &props = result_obj.get_or_create_properties ();
+#define PROPERTY_PREFIX "gcc/analyzer/overlapping_buffers/"
+    props.set (PROPERTY_PREFIX "bytes_range_a",
+	       m_byte_range_a.to_json ());
+    props.set (PROPERTY_PREFIX "bytes_range_b",
+	       m_byte_range_b.to_json ());
+    props.set (PROPERTY_PREFIX "num_bytes_read_sval",
+	       m_num_bytes_read_sval->to_json ());
+#undef PROPERTY_PREFIX
+  }
+
+private:
+  tree m_fndecl;
+  symbolic_byte_range m_byte_range_a;
+  symbolic_byte_range m_byte_range_b;
+  const svalue *m_num_bytes_read_sval;
+};
+
+
+/* Check if the buffers pointed to by arguments ARG_IDX_A and ARG_IDX_B
+   (zero-based) overlap, when considering them both to be of size
+   NUM_BYTES_READ_SVAL.
+
+   If they do overlap, complain to the context.  */
+
+void
+call_details::complain_about_overlap (unsigned arg_idx_a,
+				      unsigned arg_idx_b,
+				      const svalue *num_bytes_read_sval) const
+{
+  region_model_context *ctxt = get_ctxt ();
+  if (!ctxt)
+    return;
+
+  region_model *model = get_model ();
+  region_model_manager *mgr = model->get_manager ();
+
+  const svalue *arg_a_ptr_sval = get_arg_svalue (arg_idx_a);
+  if (arg_a_ptr_sval->get_kind () == SK_UNKNOWN)
+    return;
+  const region *arg_a_reg = model->deref_rvalue (arg_a_ptr_sval,
+						 get_arg_tree (arg_idx_a),
+						 ctxt);
+  const svalue *arg_b_ptr_sval = get_arg_svalue (arg_idx_b);
+  if (arg_b_ptr_sval->get_kind () == SK_UNKNOWN)
+    return;
+  const region *arg_b_reg = model->deref_rvalue (arg_b_ptr_sval,
+						 get_arg_tree (arg_idx_b),
+						 ctxt);
+  if (arg_a_reg->get_base_region () != arg_b_reg->get_base_region ())
+    return;
+
+  /* Are they within NUM_BYTES_READ_SVAL of each other?  */
+  symbolic_byte_range byte_range_a (arg_a_reg->get_offset (mgr),
+				    num_bytes_read_sval,
+				    *mgr);
+  symbolic_byte_range byte_range_b (arg_b_reg->get_offset (mgr),
+				    num_bytes_read_sval,
+				    *mgr);
+  if (!byte_range_a.intersection (byte_range_b, *model).is_true ())
+    return;
+
+  ctxt->warn (make_unique<overlapping_buffers> (get_fndecl_for_call (),
+						byte_range_a,
+						byte_range_b,
+						num_bytes_read_sval));
 }
 
 } // namespace ana

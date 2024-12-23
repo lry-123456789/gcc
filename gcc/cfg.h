@@ -1,5 +1,5 @@
 /* Control flow graph manipulation code header file.
-   Copyright (C) 2014-2023 Free Software Foundation, Inc.
+   Copyright (C) 2014-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -78,6 +78,9 @@ struct GTY(()) control_flow_graph {
   /* Dynamically allocated edge/bb flags.  */
   int edge_flags_allocated;
   int bb_flags_allocated;
+
+  /* Set if the profile is computed on every edge and basic block.  */
+  bool full_profile;
 };
 
 

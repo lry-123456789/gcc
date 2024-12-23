@@ -1,5 +1,5 @@
-/* { dg-do run { target { riscv_vector } } } */
-/* { dg-options "-O3 -Wno-psabi" } */
+/* { dg-do run { target { riscv_v } } } */
+/* { dg-options "-O3" } */
 
 #include "riscv_vector.h"
 #include <stdio.h>

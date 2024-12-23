@@ -1,5 +1,5 @@
-/* { dg-do run { target { riscv_vector } } } */
-/* { dg-additional-options "--param=riscv-autovec-preference=scalable -fno-vect-cost-model" } */
+/* { dg-do run { target { riscv_v } } } */
+/* { dg-additional-options "-mrvv-vector-bits=scalable -fno-vect-cost-model" } */
 
 #include "reduc_strict-1.c"
 
@@ -17,7 +17,8 @@
 	asm volatile ("" ::: "memory");		\
       }						\
     TYPE res = reduc_plus_##TYPE (a, b);	\
-    if (res != r * q)				\
+    TYPE ref = r * q;				\
+    if (res != ref)				\
       __builtin_abort ();			\
   }
 

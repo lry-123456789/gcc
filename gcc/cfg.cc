@@ -1,5 +1,5 @@
 /* Control flow graph manipulation code for GNU compiler.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -81,6 +81,7 @@ init_flow (struct function *the_fun)
     = ENTRY_BLOCK_PTR_FOR_FN (the_fun);
   the_fun->cfg->edge_flags_allocated = EDGE_ALL_FLAGS;
   the_fun->cfg->bb_flags_allocated = BB_ALL_FLAGS;
+  the_fun->cfg->full_profile = false;
 }
 
 /* Helper function for remove_edge and free_cffg.  Frees edge structure
@@ -125,7 +126,7 @@ free_cfg (struct function *fn)
   gcc_assert (!n_edges_for_fn (fn));
   /* Sanity check that dominance tree is freed.  */
   gcc_assert (!fn->cfg->x_dom_computed[0] && !fn->cfg->x_dom_computed[1]);
-  
+
   vec_free (fn->cfg->x_label_to_block_map);
   vec_free (basic_block_info_for_fn (fn));
   ggc_free (fn->cfg);
@@ -503,7 +504,7 @@ dump_edge_info (FILE *file, edge e, dump_flags_t flags, int do_succ)
 {
   basic_block side = (do_succ ? e->dest : e->src);
   bool do_details = false;
-  
+
   if ((flags & TDF_DETAILS) != 0
       && (flags & TDF_SLIM) == 0)
     do_details = true;
@@ -970,7 +971,7 @@ set_edge_probability_and_rescale_others (edge e, profile_probability new_prob)
    frequency or count is believed to be lower than COUNT
    respectively.  */
 void
-update_bb_profile_for_threading (basic_block bb, 
+update_bb_profile_for_threading (basic_block bb,
 				 profile_count count, edge taken_edge)
 {
   gcc_assert (bb == taken_edge->src);

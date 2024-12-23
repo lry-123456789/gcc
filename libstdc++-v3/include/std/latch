@@ -1,6 +1,6 @@
 // <latch> -*- C++ -*-
 
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -29,21 +29,22 @@
 #ifndef _GLIBCXX_LATCH
 #define _GLIBCXX_LATCH 1
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #include <bits/requires_hosted.h> // concurrency
 
-#if __cplusplus > 201703L
+#define __glibcxx_want_latch
+#include <bits/version.h>
 
+#ifdef __cpp_lib_latch // C++ >= 20 && atomic_wait
 #include <bits/atomic_base.h>
 #include <ext/numeric_traits.h>
 
-#if __cpp_lib_atomic_wait
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
-
-#define __cpp_lib_latch 201907L
 
   class latch
   {
@@ -62,9 +63,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     _GLIBCXX_ALWAYS_INLINE void
     count_down(ptrdiff_t __update = 1)
     {
+      __glibcxx_assert(__update >= 0);
       auto const __old = __atomic_impl::fetch_sub(&_M_a,
 				    __update, memory_order::release);
-      if (__old == __update)
+      __glibcxx_assert(__update >= 0);
+      if (__old == static_cast<__detail::__platform_wait_t>(__update))
 	__atomic_impl::notify_all(&_M_a);
     }
 
@@ -87,10 +90,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   private:
+    // This alignas is not redundant, it increases the alignment for
+    // long long on x86.
     alignas(__alignof__(__detail::__platform_wait_t)) __detail::__platform_wait_t _M_a;
   };
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
-#endif // __cpp_lib_atomic_wait
-#endif // __cplusplus > 201703L
+#endif // __cpp_lib_latch
 #endif // _GLIBCXX_LATCH

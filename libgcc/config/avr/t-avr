@@ -36,13 +36,13 @@ LIB1ASMFUNCS = \
 	_fmul _fmuls _fmulsu
 
 # The below functions either use registers that are not present
-# in tiny core, or use a different register conventions (don't save
+# in tiny core, or use a different register convention (don't save
 # callee saved regs, for example)
 # _mulhisi3 and variations - clobber R18, R19
 # All *di funcs - use regs < R16 or expect args in regs < R20
 # _prologue and _epilogue save registers < R16
-# _load ad _xload variations - expect lpm and elpm support
-# _movmemx - expects elpm/lpm
+# _load, __fload and _xload variations - expect lpm and elpm support
+# _movmemx and _movmemf - expect elpm/lpm
 
 ifneq ($(MULTIFLAGS),-mmcu=avrtiny)
 LIB1ASMFUNCS += \
@@ -61,14 +61,16 @@ LIB1ASMFUNCS += \
 	_epilogue \
 	_load_3 _load_4 \
 	_xload_1 _xload_2 _xload_3 _xload_4 \
-	_movmemx \
+	_fload_1 _fload_2 _fload_3 _fload_4 \
+	_movmemx _movmemf \
 	_clzdi2 \
 	_paritydi2 \
 	_popcountdi2 \
 	_bswapdi2 \
 	_ashldi3 _ashrdi3 _lshrdi3 _rotldi3 \
 	_adddi3 _adddi3_s8 _subdi3 \
-	_cmpdi2 _cmpdi2_s8
+	_cmpdi2 _cmpdi2_s8 \
+	_powif
 endif
 
 # Fixed point routines in avr/lib1funcs-fixed.S
@@ -110,6 +112,7 @@ LIB2FUNCS_EXCLUDE = \
 	_moddi3 _umoddi3 \
 	_clz \
 	_clrsbdi2 \
+	_powisf2
 
 
 ifeq ($(long_double_type_size),32)

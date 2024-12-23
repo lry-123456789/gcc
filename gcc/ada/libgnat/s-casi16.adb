@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2002-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 2002-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -29,7 +29,7 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
-with System.Address_Operations; use System.Address_Operations;
+with System.Storage_Elements; use System.Storage_Elements;
 
 with Ada.Unchecked_Conversion;
 
@@ -77,19 +77,23 @@ package body System.Compare_Array_Signed_16 is
    begin
       --  Go by words if possible
 
-      if ModA (OrA (Left, Right), 4) = 0 then
+      if Left mod Storage_Offset (4) = 0
+        and then Right mod Storage_Offset (4) = 0
+      then
          while Clen > 1
            and then W (L).all = W (R).all
          loop
             Clen := Clen - 2;
-            L := AddA (L, 4);
-            R := AddA (R, 4);
+            L := L + Storage_Offset (4);
+            R := R + Storage_Offset (4);
          end loop;
       end if;
 
       --  Case of going by aligned half words
 
-      if ModA (OrA (Left, Right), 2) = 0 then
+      if Left mod Storage_Offset (2) = 0
+        and then Right mod Storage_Offset (2) = 0
+      then
          while Clen /= 0 loop
             if H (L).all /= H (R).all then
                if H (L).all > H (R).all then
@@ -100,8 +104,8 @@ package body System.Compare_Array_Signed_16 is
             end if;
 
             Clen := Clen - 1;
-            L := AddA (L, 2);
-            R := AddA (R, 2);
+            L := L + Storage_Offset (2);
+            R := R + Storage_Offset (2);
          end loop;
 
       --  Case of going by unaligned half words
@@ -117,8 +121,8 @@ package body System.Compare_Array_Signed_16 is
             end if;
 
             Clen := Clen - 1;
-            L := AddA (L, 2);
-            R := AddA (R, 2);
+            L := L + Storage_Offset (2);
+            R := R + Storage_Offset (2);
          end loop;
       end if;
 

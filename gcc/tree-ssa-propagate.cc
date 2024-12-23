@@ -1,5 +1,5 @@
 /* Generic SSA value propagation engine.
-   Copyright (C) 2004-2023 Free Software Foundation, Inc.
+   Copyright (C) 2004-2024 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
    This file is part of GCC.
@@ -85,7 +85,7 @@
 	    Blocks are added to this list if their incoming edges are
 	    found executable.
 
-	SSA_EDGE_WORKLIST contains the list of statements that we 
+	SSA_EDGE_WORKLIST contains the list of statements that we
 	    need to revisit.
 
    5- Simulation terminates when all three work lists are drained.
@@ -789,6 +789,10 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
 		  fprintf (dump_file, "\n");
 		}
 	      bitmap_set_bit (dceworklist, SSA_NAME_VERSION (res));
+	      /* As this now constitutes a copy duplicate points-to
+		 and range info appropriately.  */
+	      if (TREE_CODE (sprime) == SSA_NAME)
+		maybe_duplicate_ssa_info_at_copy (res, sprime);
 	      continue;
 	    }
 	}
@@ -831,6 +835,10 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
 		  fprintf (dump_file, "\n");
 		}
 	      bitmap_set_bit (dceworklist, SSA_NAME_VERSION (lhs));
+	      /* As this now constitutes a copy duplicate points-to
+		 and range info appropriately.  */
+	      if (TREE_CODE (sprime) == SSA_NAME)
+		maybe_duplicate_ssa_info_at_copy (lhs, sprime);
 	      continue;
 	    }
 	}
@@ -1032,11 +1040,12 @@ substitute_and_fold_engine::substitute_and_fold (basic_block block)
 
 
 /* Return true if we may propagate ORIG into DEST, false otherwise.
-   If DEST_NOT_PHI_ARG_P is true then assume the propagation does
-   not happen into a PHI argument which relaxes some constraints.  */
+   If DEST_NOT_ABNORMAL_PHI_EDGE_P is true then assume the propagation does
+   not happen into a PHI argument which flows in from an abnormal edge
+   which relaxes some constraints.  */
 
 bool
-may_propagate_copy (tree dest, tree orig, bool dest_not_phi_arg_p)
+may_propagate_copy (tree dest, tree orig, bool dest_not_abnormal_phi_edge_p)
 {
   tree type_d = TREE_TYPE (dest);
   tree type_o = TREE_TYPE (orig);
@@ -1056,9 +1065,9 @@ may_propagate_copy (tree dest, tree orig, bool dest_not_phi_arg_p)
 	   && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (orig))
     return false;
   /* Similarly if DEST flows in from an abnormal edge then the copy cannot be
-     propagated.  If we know we do not propagate into a PHI argument this
+     propagated.  If we know we do not propagate into such a PHI argument this
      does not apply.  */
-  else if (!dest_not_phi_arg_p
+  else if (!dest_not_abnormal_phi_edge_p
 	   && TREE_CODE (dest) == SSA_NAME
 	   && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (dest))
     return false;
@@ -1162,8 +1171,13 @@ void
 propagate_value (use_operand_p op_p, tree val)
 {
   if (flag_checking)
-    gcc_assert (may_propagate_copy (USE_FROM_PTR (op_p), val,
-				    !is_a <gphi *> (USE_STMT (op_p))));
+    {
+      bool ab = (is_a <gphi *> (USE_STMT (op_p))
+		 && (gimple_phi_arg_edge (as_a <gphi *> (USE_STMT (op_p)),
+					  PHI_ARG_INDEX_FROM_USE (op_p))
+		     ->flags & EDGE_ABNORMAL));
+      gcc_assert (may_propagate_copy (USE_FROM_PTR (op_p), val, !ab));
+    }
   replace_exp (op_p, val);
 }
 

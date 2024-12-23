@@ -1,5 +1,5 @@
 /* Reload pseudo regs into hard regs for insns that require hard regs.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -196,7 +196,7 @@ static int last_spill_reg;
 static rtx spill_stack_slot[FIRST_PSEUDO_REGISTER];
 
 /* Width allocated so far for that stack slot.  */
-static poly_uint64_pod spill_stack_slot_width[FIRST_PSEUDO_REGISTER];
+static poly_uint64 spill_stack_slot_width[FIRST_PSEUDO_REGISTER];
 
 /* Record which pseudos needed to be spilled.  */
 static regset_head spilled_pseudos;
@@ -257,13 +257,13 @@ struct elim_table
 {
   int from;			/* Register number to be eliminated.  */
   int to;			/* Register number used as replacement.  */
-  poly_int64_pod initial_offset; /* Initial difference between values.  */
+  poly_int64 initial_offset; /* Initial difference between values.  */
   int can_eliminate;		/* Nonzero if this elimination can be done.  */
   int can_eliminate_previous;	/* Value returned by TARGET_CAN_ELIMINATE
 				   target hook in previous scan over insns
 				   made by reload.  */
-  poly_int64_pod offset;	/* Current offset between the two regs.  */
-  poly_int64_pod previous_offset; /* Offset at end of previous insn.  */
+  poly_int64 offset;		/* Current offset between the two regs.  */
+  poly_int64 previous_offset;	/* Offset at end of previous insn.  */
   int ref_outside_mem;		/* "to" has been referenced outside a MEM.  */
   rtx from_rtx;			/* REG rtx for the register to be eliminated.
 				   We cannot simply compare the number since
@@ -283,7 +283,13 @@ static const struct elim_table_1
   const int to;
 } reg_eliminate_1[] =
 
+  /* Reload and LRA don't agree on how a multi-register frame pointer
+     is represented for elimination.  See avr.h for a use case.  */
+#ifdef RELOAD_ELIMINABLE_REGS
+  RELOAD_ELIMINABLE_REGS;
+#else
   ELIMINABLE_REGS;
+#endif
 
 #define NUM_ELIMINABLE_REGS ARRAY_SIZE (reg_eliminate_1)
 
@@ -309,13 +315,13 @@ static int num_eliminable_invariants;
 
 static int first_label_num;
 static char *offsets_known_at;
-static poly_int64_pod (*offsets_at)[NUM_ELIMINABLE_REGS];
+static poly_int64 (*offsets_at)[NUM_ELIMINABLE_REGS];
 
 vec<reg_equivs_t, va_gc> *reg_equivs;
 
-/* Stack of addresses where an rtx has been changed.  We can undo the 
+/* Stack of addresses where an rtx has been changed.  We can undo the
    changes by popping items off the stack and restoring the original
-   value at each location. 
+   value at each location.
 
    We use this simplistic undo capability rather than copy_rtx as copy_rtx
    will not make a deep copy of a normally sharable rtx, such as
@@ -1382,7 +1388,7 @@ maybe_fix_stack_asms (void)
 		  if (insn_extra_address_constraint (cn))
 		    cls = (int) reg_class_subunion[cls]
 		      [(int) base_reg_class (VOIDmode, ADDR_SPACE_GENERIC,
-					     ADDRESS, SCRATCH)];
+					     ADDRESS, SCRATCH, chain->insn)];
 		  else
 		    cls = (int) reg_class_subunion[cls]
 		      [reg_class_for_constraint (cn)];
@@ -4020,7 +4026,7 @@ init_eliminable_invariants (rtx_insn *first, bool do_subregs)
 
   /* Allocate the tables used to store offset information at labels.  */
   offsets_known_at = XNEWVEC (char, num_labels);
-  offsets_at = (poly_int64_pod (*)[NUM_ELIMINABLE_REGS])
+  offsets_at = (poly_int64 (*)[NUM_ELIMINABLE_REGS])
     xmalloc (num_labels * NUM_ELIMINABLE_REGS * sizeof (poly_int64));
 
 /* Look for REG_EQUIV notes; record what each pseudo is equivalent
@@ -5272,7 +5278,7 @@ reload_reg_reaches_end_p (unsigned int regno, int reloadnum)
       if (regno >= REGNO (reg) && regno < END_REGNO (reg))
 	return 0;
     }
-  
+
   switch (type)
     {
     case RELOAD_OTHER:
@@ -6923,7 +6929,7 @@ choose_reload_regs (class insn_chain *chain)
 	     remove its related reloads.  */
 	  else if (rld[r].in
 		   && rld[r].out != rld[r].in
-		   && (tem = replaced_subreg (rld[r].in), REG_P (tem))		   
+		   && (tem = replaced_subreg (rld[r].in), REG_P (tem))
 		   && REGNO (tem) < FIRST_PSEUDO_REGISTER
 		   && (targetm.secondary_memory_needed
 		       (rld[r].inmode, REGNO_REG_CLASS (REGNO (tem)),
@@ -7225,7 +7231,7 @@ emit_input_reload_insns (class insn_chain *chain, struct reload *rl,
 	  /* Store into the reload register instead of the pseudo.  */
 	  SET_DEST (PATTERN (temp)) = reloadreg;
 
-	  /* Verify that resulting insn is valid. 
+	  /* Verify that resulting insn is valid.
 
 	     Note that we have replaced the destination of TEMP with
 	     RELOADREG.  If TEMP references RELOADREG within an

@@ -1,6 +1,6 @@
 // Components for manipulating sequences of characters -*- C++ -*-
 
-// Copyright (C) 1997-2023 Free Software Foundation, Inc.
+// Copyright (C) 1997-2024 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -34,7 +34,9 @@
 #ifndef _BASIC_STRING_H
 #define _BASIC_STRING_H 1
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #include <ext/alloc_traits.h>
 #include <debug/debug.h>
@@ -47,21 +49,20 @@
 # include <string_view>
 #endif
 
+#if __cplusplus > 202302L
+# include <charconv>
+#endif
+
+#include <bits/version.h>
+
 #if ! _GLIBCXX_USE_CXX11_ABI
 # include "cow_string.h"
 #else
+
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 _GLIBCXX_BEGIN_NAMESPACE_CXX11
-
-#ifdef __cpp_lib_is_constant_evaluated
-// Support P0980R1 in C++20.
-# define __cpp_lib_constexpr_string 201907L
-#elif __cplusplus >= 201703L && _GLIBCXX_HAVE_IS_CONSTANT_EVALUATED
-// Support P0426R1 changes to char_traits in C++17.
-# define __cpp_lib_constexpr_string 201611L
-#endif
 
   /**
    *  @class basic_string basic_string.h <string>
@@ -87,6 +88,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     class basic_string
     {
 #if __cplusplus >= 202002L
+      static_assert(is_trivially_copyable_v<_CharT>
+	  && is_trivially_default_constructible_v<_CharT>
+	  && is_standard_layout_v<_CharT>);
       static_assert(is_same_v<_CharT, typename _Traits::char_type>);
       static_assert(is_same_v<_CharT, typename _Alloc::value_type>);
       using _Char_alloc_type = _Alloc;
@@ -130,7 +134,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _S_allocate(_Char_alloc_type& __a, size_type __n)
       {
 	pointer __p = _Alloc_traits::allocate(__a, __n);
-#if __cpp_lib_constexpr_string >= 201907L
+#if __glibcxx_constexpr_string >= 201907L
 	// std::char_traits begins the lifetime of characters,
 	// but custom traits might not, so do it here.
 	if constexpr (!is_same_v<_Traits, char_traits<_CharT>>)
@@ -350,13 +354,23 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       // Ensure that _M_local_buf is the active member of the union.
       __attribute__((__always_inline__))
       _GLIBCXX14_CONSTEXPR
+      void
+      _M_init_local_buf() _GLIBCXX_NOEXCEPT
+      {
+#if __glibcxx_is_constant_evaluated
+	if (std::is_constant_evaluated())
+	  for (size_type __i = 0; __i <= _S_local_capacity; ++__i)
+	    _M_local_buf[__i] = _CharT();
+#endif
+      }
+
+      __attribute__((__always_inline__))
+      _GLIBCXX14_CONSTEXPR
       pointer
       _M_use_local_data() _GLIBCXX_NOEXCEPT
       {
 #if __cpp_lib_is_constant_evaluated
-	if (std::is_constant_evaluated())
-	  for (size_type __i = 0; __i <= _S_local_capacity; ++__i)
-	    _M_local_buf[__i] = _CharT();
+	_M_init_local_buf();
 #endif
 	return _M_local_data();
       }
@@ -517,9 +531,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       basic_string()
       _GLIBCXX_NOEXCEPT_IF(is_nothrow_default_constructible<_Alloc>::value)
+#if __cpp_concepts && __glibcxx_type_trait_variable_templates
+      requires is_default_constructible_v<_Alloc>
+#endif
       : _M_dataplus(_M_local_data())
       {
-	_M_use_local_data();
+	_M_init_local_buf();
 	_M_set_length(0);
       }
 
@@ -531,7 +548,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       basic_string(const _Alloc& __a) _GLIBCXX_NOEXCEPT
       : _M_dataplus(_M_local_data(), __a)
       {
-	_M_use_local_data();
+	_M_init_local_buf();
 	_M_set_length(0);
       }
 
@@ -675,6 +692,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       {
 	if (__str._M_is_local())
 	  {
+	    _M_init_local_buf();
 	    traits_type::copy(_M_local_buf, __str._M_local_buf,
 			      __str.length() + 1);
 	  }
@@ -688,7 +706,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	// basic_stringbuf relies on writing into unallocated capacity so
 	// we mess up the contents if we put a '\0' in the string.
 	_M_length(__str.length());
-	__str._M_data(__str._M_local_data());
+	__str._M_data(__str._M_use_local_data());
 	__str._M_set_length(0);
       }
 
@@ -714,6 +732,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       {
 	if (__str._M_is_local())
 	  {
+	    _M_init_local_buf();
 	    traits_type::copy(_M_local_buf, __str._M_local_buf,
 			      __str.length() + 1);
 	    _M_length(__str.length());
@@ -725,7 +744,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	    _M_data(__str._M_data());
 	    _M_length(__str.length());
 	    _M_capacity(__str._M_allocated_capacity);
-	    __str._M_data(__str._M_local_buf);
+	    __str._M_data(__str._M_use_local_data());
 	    __str._M_set_length(0);
 	  }
 	else
@@ -898,10 +917,10 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 		__str._M_capacity(__capacity);
 	      }
 	    else
-	      __str._M_data(__str._M_local_buf);
+	      __str._M_data(__str._M_use_local_data());
 	  }
 	else // Need to do a deep copy
-	  assign(__str);
+	  _M_assign(__str);
 	__str.clear();
 	return *this;
       }
@@ -1063,20 +1082,30 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       size_type
       size() const _GLIBCXX_NOEXCEPT
-      { return _M_string_length; }
+      {
+	size_type __sz = _M_string_length;
+	if (__sz > max_size ())
+	  __builtin_unreachable ();
+	return __sz;
+      }
 
       ///  Returns the number of characters in the string, not including any
       ///  null-termination.
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       size_type
       length() const _GLIBCXX_NOEXCEPT
-      { return _M_string_length; }
+      { return size(); }
 
       ///  Returns the size() of the largest possible %string.
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       size_type
       max_size() const _GLIBCXX_NOEXCEPT
-      { return (_Alloc_traits::max_size(_M_get_allocator()) - 1) / 2; }
+      {
+	const size_t __diffmax
+	  = __gnu_cxx::__numeric_traits<ptrdiff_t>::__max / sizeof(_CharT);
+	const size_t __allocmax = _Alloc_traits::max_size(_M_get_allocator());
+	return (std::min)(__diffmax, __allocmax) - 1;
+      }
 
       /**
        *  @brief  Resizes the %string to the specified number of characters.
@@ -1118,8 +1147,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #pragma GCC diagnostic pop
 #endif
 
-#if __cplusplus > 202002L
-#define __cpp_lib_string_resize_and_overwrite 202110L
+#ifdef __glibcxx_string_resize_and_overwrite // C++ >= 23
       /** Resize the string and call a function to fill it.
        *
        * @param __n   The maximum size requested.
@@ -1154,6 +1182,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	resize_and_overwrite(size_type __n, _Operation __op);
 #endif
 
+#if __cplusplus >= 201103L
+      /// Non-standard version of resize_and_overwrite for C++11 and above.
+      template<typename _Operation>
+	_GLIBCXX20_CONSTEXPR void
+	__resize_and_overwrite(size_type __n, _Operation __op);
+#endif
+
       /**
        *  Returns the total number of characters that the %string can hold
        *  before needing to allocate more memory.
@@ -1162,8 +1197,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       size_type
       capacity() const _GLIBCXX_NOEXCEPT
       {
-	return _M_is_local() ? size_type(_S_local_capacity)
-	                     : _M_allocated_capacity;
+	size_t __sz = _M_is_local() ? size_type(_S_local_capacity)
+				     : _M_allocated_capacity;
+	if (__sz < _S_local_capacity || __sz > max_size ())
+	  __builtin_unreachable ();
+	return __sz;
       }
 
       /**
@@ -1206,13 +1244,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       { _M_set_length(0); }
 
       /**
-       *  Returns true if the %string is empty.  Equivalent to 
+       *  Returns true if the %string is empty.  Equivalent to
        *  <code>*this == ""</code>.
        */
       _GLIBCXX_NODISCARD _GLIBCXX20_CONSTEXPR
       bool
       empty() const _GLIBCXX_NOEXCEPT
-      { return this->size() == 0; }
+      { return _M_string_length == 0; }
 
       // Element access:
       /**
@@ -1702,15 +1740,43 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Sets value of string to characters in the range [__first,__last).
       */
 #if __cplusplus >= 201103L
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++17-extensions"
       template<class _InputIterator,
 	       typename = std::_RequireInputIter<_InputIterator>>
 	_GLIBCXX20_CONSTEXPR
+	basic_string&
+	assign(_InputIterator __first, _InputIterator __last)
+	{
+	  using _IterTraits = iterator_traits<_InputIterator>;
+	  if constexpr (is_pointer<decltype(std::__niter_base(__first))>::value
+			  && is_same<typename _IterTraits::value_type,
+				     _CharT>::value)
+	    {
+	      __glibcxx_requires_valid_range(__first, __last);
+	      return _M_replace(size_type(0), size(),
+				std::__niter_base(__first), __last - __first);
+	    }
+#if __cplusplus >= 202002L
+	  else if constexpr (contiguous_iterator<_InputIterator>
+			       && is_same_v<iter_value_t<_InputIterator>,
+					    _CharT>)
+	    {
+	      __glibcxx_requires_valid_range(__first, __last);
+	      return _M_replace(size_type(0), size(),
+				std::to_address(__first), __last - __first);
+	    }
+#endif
+	  else
+	    return *this = basic_string(__first, __last, get_allocator());
+	}
+#pragma GCC diagnostic pop
 #else
       template<class _InputIterator>
+	basic_string&
+	assign(_InputIterator __first, _InputIterator __last)
+	{ return this->replace(begin(), end(), __first, __last); }
 #endif
-        basic_string&
-        assign(_InputIterator __first, _InputIterator __last)
-        { return this->replace(begin(), end(), __first, __last); }
 
 #if __cplusplus >= 201103L
       /**
@@ -1721,7 +1787,20 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       basic_string&
       assign(initializer_list<_CharT> __l)
-      { return this->assign(__l.begin(), __l.size()); }
+      {
+	// The initializer_list array cannot alias the characters in *this
+	// so we don't need to use replace to that case.
+	const size_type __n = __l.size();
+	if (__n > capacity())
+	  *this = basic_string(__l.begin(), __l.end(), get_allocator());
+	else
+	  {
+	    if (__n)
+	      _S_copy(_M_data(), __l.begin(), __n);
+	    _M_set_length(__n);
+	  }
+	return *this;
+      }
 #endif // C++11
 
 #if __cplusplus >= 201703L
@@ -3691,6 +3770,54 @@ _GLIBCXX_END_NAMESPACE_CXX11
     { return std::move(__lhs.append(1, __rhs)); }
 #endif
 
+#if __glibcxx_string_view >= 202403L
+  // const string & + string_view
+  template<typename _CharT, typename _Traits, typename _Alloc>
+    [[nodiscard]]
+    constexpr basic_string<_CharT, _Traits, _Alloc>
+    operator+(const basic_string<_CharT, _Traits, _Alloc>& __lhs,
+	       type_identity_t<basic_string_view<_CharT, _Traits>> __rhs)
+    {
+      using _Str = basic_string<_CharT, _Traits, _Alloc>;
+      return std::__str_concat<_Str>(__lhs.data(), __lhs.size(),
+				      __rhs.data(), __rhs.size(),
+				      __lhs.get_allocator());
+    }
+
+  // string && + string_view
+  template<typename _CharT, typename _Traits, typename _Alloc>
+    [[nodiscard]]
+    constexpr basic_string<_CharT, _Traits, _Alloc>
+    operator+(basic_string<_CharT, _Traits, _Alloc>&& __lhs,
+	       type_identity_t<basic_string_view<_CharT, _Traits>> __rhs)
+    {
+      return std::move(__lhs.append(__rhs));
+    }
+
+  // string_view + const string &
+  template<typename _CharT, typename _Traits, typename _Alloc>
+    [[nodiscard]]
+    constexpr basic_string<_CharT, _Traits, _Alloc>
+    operator+(type_identity_t<basic_string_view<_CharT, _Traits>> __lhs,
+	       const basic_string<_CharT, _Traits, _Alloc>& __rhs)
+    {
+      using _Str = basic_string<_CharT, _Traits, _Alloc>;
+      return std::__str_concat<_Str>(__lhs.data(), __lhs.size(),
+				      __rhs.data(), __rhs.size(),
+				      __rhs.get_allocator());
+    }
+
+  // string_view + string &&
+  template<typename _CharT, typename _Traits, typename _Alloc>
+    [[nodiscard]]
+    constexpr basic_string<_CharT, _Traits, _Alloc>
+    operator+(type_identity_t<basic_string_view<_CharT, _Traits>> __lhs,
+	       basic_string<_CharT, _Traits, _Alloc>&& __rhs)
+    {
+      return std::move(__rhs.insert(0, __lhs));
+    }
+#endif
+
   // operator ==
   /**
    *  @brief  Test equivalence of two strings.
@@ -4093,7 +4220,7 @@ _GLIBCXX_END_NAMESPACE_CXX11
     basic_istream<wchar_t>&
     getline(basic_istream<wchar_t>& __in, basic_string<wchar_t>& __str,
 	    wchar_t __delim);
-#endif  
+#endif
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
@@ -4181,6 +4308,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   { return std::stod(__str, __idx); }
 #endif
 
+  // _GLIBCXX_RESOLVE_LIB_DEFECTS
   // DR 1261. Insufficent overloads for to_string / to_wstring
 
   _GLIBCXX_NODISCARD
@@ -4193,8 +4321,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     const bool __neg = __val < 0;
     const unsigned __uval = __neg ? (unsigned)~__val + 1u : __val;
     const auto __len = __detail::__to_chars_len(__uval);
-    string __str(__neg + __len, '-');
-    __detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
+    string __str;
+    __str.__resize_and_overwrite(__neg + __len, [=](char* __p, size_t __n) {
+      __p[0] = '-';
+      __detail::__to_chars_10_impl(__p + (int)__neg, __len, __uval);
+      return __n;
+    });
     return __str;
   }
 
@@ -4205,8 +4337,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   noexcept // any 32-bit value fits in the SSO buffer
 #endif
   {
-    string __str(__detail::__to_chars_len(__val), '\0');
-    __detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
+    const auto __len = __detail::__to_chars_len(__val);
+    string __str;
+    __str.__resize_and_overwrite(__len, [__val](char* __p, size_t __n) {
+      __detail::__to_chars_10_impl(__p, __n, __val);
+      return __n;
+    });
     return __str;
   }
 
@@ -4220,8 +4356,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     const bool __neg = __val < 0;
     const unsigned long __uval = __neg ? (unsigned long)~__val + 1ul : __val;
     const auto __len = __detail::__to_chars_len(__uval);
-    string __str(__neg + __len, '-');
-    __detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
+    string __str;
+    __str.__resize_and_overwrite(__neg + __len, [=](char* __p, size_t __n) {
+      __p[0] = '-';
+      __detail::__to_chars_10_impl(__p + (int)__neg, __len, __uval);
+      return __n;
+    });
     return __str;
   }
 
@@ -4232,8 +4372,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   noexcept // any 32-bit value fits in the SSO buffer
 #endif
   {
-    string __str(__detail::__to_chars_len(__val), '\0');
-    __detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
+    const auto __len = __detail::__to_chars_len(__val);
+    string __str;
+    __str.__resize_and_overwrite(__len, [__val](char* __p, size_t __n) {
+      __detail::__to_chars_10_impl(__p, __n, __val);
+      return __n;
+    });
     return __str;
   }
 
@@ -4245,8 +4389,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     const unsigned long long __uval
       = __neg ? (unsigned long long)~__val + 1ull : __val;
     const auto __len = __detail::__to_chars_len(__uval);
-    string __str(__neg + __len, '-');
-    __detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
+    string __str;
+    __str.__resize_and_overwrite(__neg + __len, [=](char* __p, size_t __n) {
+      __p[0] = '-';
+      __detail::__to_chars_10_impl(__p + (int)__neg, __len, __uval);
+      return __n;
+    });
     return __str;
   }
 
@@ -4254,19 +4402,83 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   inline string
   to_string(unsigned long long __val)
   {
-    string __str(__detail::__to_chars_len(__val), '\0');
-    __detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
+    const auto __len = __detail::__to_chars_len(__val);
+    string __str;
+    __str.__resize_and_overwrite(__len, [__val](char* __p, size_t __n) {
+      __detail::__to_chars_10_impl(__p, __n, __val);
+      return __n;
+    });
     return __str;
   }
 
-#if _GLIBCXX_USE_C99_STDIO
+#if __glibcxx_to_string >= 202306L // C++ >= 26
+
+  [[nodiscard]]
+  inline string
+  to_string(float __val)
+  {
+    string __str;
+    size_t __len = 15;
+    do {
+      __str.resize_and_overwrite(__len,
+				 [__val, &__len] (char* __p, size_t __n) {
+	auto [__end, __err] = std::to_chars(__p, __p + __n, __val);
+	if (__err == errc{}) [[likely]]
+	  return __end - __p;
+	__len *= 2;
+	return __p - __p;;
+      });
+    } while (__str.empty());
+    return __str;
+  }
+
+  [[nodiscard]]
+  inline string
+  to_string(double __val)
+  {
+    string __str;
+    size_t __len = 15;
+    do {
+      __str.resize_and_overwrite(__len,
+				 [__val, &__len] (char* __p, size_t __n) {
+	auto [__end, __err] = std::to_chars(__p, __p + __n, __val);
+	if (__err == errc{}) [[likely]]
+	  return __end - __p;
+	__len *= 2;
+	return __p - __p;;
+      });
+    } while (__str.empty());
+    return __str;
+  }
+
+  [[nodiscard]]
+  inline string
+  to_string(long double __val)
+  {
+    string __str;
+    size_t __len = 15;
+    do {
+      __str.resize_and_overwrite(__len,
+				 [__val, &__len] (char* __p, size_t __n) {
+	auto [__end, __err] = std::to_chars(__p, __p + __n, __val);
+	if (__err == errc{}) [[likely]]
+	  return __end - __p;
+	__len *= 2;
+	return __p - __p;;
+      });
+    } while (__str.empty());
+    return __str;
+  }
+#elif _GLIBCXX_USE_C99_STDIO
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsuggest-attribute=format"
   // NB: (v)snprintf vs sprintf.
 
   _GLIBCXX_NODISCARD
   inline string
   to_string(float __val)
   {
-    const int __n = 
+    const int __n =
       __gnu_cxx::__numeric_traits<float>::__max_exponent10 + 20;
     return __gnu_cxx::__to_xstring<string>(&std::vsnprintf, __n,
 					   "%f", __val);
@@ -4276,7 +4488,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   inline string
   to_string(double __val)
   {
-    const int __n = 
+    const int __n =
       __gnu_cxx::__numeric_traits<double>::__max_exponent10 + 20;
     return __gnu_cxx::__to_xstring<string>(&std::vsnprintf, __n,
 					   "%f", __val);
@@ -4286,20 +4498,21 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   inline string
   to_string(long double __val)
   {
-    const int __n = 
+    const int __n =
       __gnu_cxx::__numeric_traits<long double>::__max_exponent10 + 20;
     return __gnu_cxx::__to_xstring<string>(&std::vsnprintf, __n,
 					   "%Lf", __val);
   }
+#pragma GCC diagnostic pop
 #endif // _GLIBCXX_USE_C99_STDIO
 
 #if defined(_GLIBCXX_USE_WCHAR_T) && _GLIBCXX_USE_C99_WCHAR
-  inline int 
+  inline int
   stoi(const wstring& __str, size_t* __idx = 0, int __base = 10)
   { return __gnu_cxx::__stoa<long, int>(&std::wcstol, "stoi", __str.c_str(),
 					__idx, __base); }
 
-  inline long 
+  inline long
   stol(const wstring& __str, size_t* __idx = 0, int __base = 10)
   { return __gnu_cxx::__stoa(&std::wcstol, "stol", __str.c_str(),
 			     __idx, __base); }
@@ -4331,80 +4544,131 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   inline long double
   stold(const wstring& __str, size_t* __idx = 0)
   { return __gnu_cxx::__stoa(&std::wcstold, "stold", __str.c_str(), __idx); }
+#endif
 
-#ifndef _GLIBCXX_HAVE_BROKEN_VSWPRINTF
-  // DR 1261.
+#ifdef _GLIBCXX_USE_WCHAR_T
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++17-extensions"
+  _GLIBCXX20_CONSTEXPR
+  inline void
+  __to_wstring_numeric(const char* __s, int __len, wchar_t* __wout)
+  {
+    // This condition is true if exec-charset and wide-exec-charset share the
+    // same values for the ASCII subset or the EBCDIC invariant character set.
+    if constexpr (wchar_t('0') == L'0' && wchar_t('-') == L'-'
+		    && wchar_t('.') == L'.' && wchar_t('e') == L'e')
+      {
+	for (int __i = 0; __i < __len; ++__i)
+	  __wout[__i] = (wchar_t) __s[__i];
+      }
+    else
+      {
+	wchar_t __wc[256];
+	for (int __i = '0'; __i <= '9'; ++__i)
+	  __wc[__i] = L'0' + __i;
+	__wc['.'] = L'.';
+	__wc['+'] = L'+';
+	__wc['-'] = L'-';
+	__wc['a'] = L'a';
+	__wc['b'] = L'b';
+	__wc['c'] = L'c';
+	__wc['d'] = L'd';
+	__wc['e'] = L'e';
+	__wc['f'] = L'f';
+	__wc['i'] = L'i'; // for "inf"
+	__wc['n'] = L'n'; // for "nan" and "inf"
+	__wc['p'] = L'p'; // for hexfloats "0x1p1"
+	__wc['x'] = L'x';
+	__wc['A'] = L'A';
+	__wc['B'] = L'B';
+	__wc['C'] = L'C';
+	__wc['D'] = L'D';
+	__wc['E'] = L'E';
+	__wc['F'] = L'F';
+	__wc['I'] = L'I';
+	__wc['N'] = L'N';
+	__wc['P'] = L'P';
+	__wc['X'] = L'X';
+
+	for (int __i = 0; __i < __len; ++__i)
+	  __wout[__i] = __wc[(int)__s[__i]];
+      }
+  }
+
+#if __glibcxx_constexpr_string >= 201907L
+  constexpr
+#endif
+  inline wstring
+#if __cplusplus >= 201703L
+  __to_wstring_numeric(string_view __s)
+#else
+  __to_wstring_numeric(const string& __s)
+#endif
+  {
+    if constexpr (wchar_t('0') == L'0' && wchar_t('-') == L'-'
+		    && wchar_t('.') == L'.' && wchar_t('e') == L'e')
+      return wstring(__s.data(), __s.data() + __s.size());
+    else
+      {
+	wstring __ws;
+	auto __f = __s.data();
+	__ws.__resize_and_overwrite(__s.size(),
+				    [__f] (wchar_t* __to, int __n) {
+				      std::__to_wstring_numeric(__f, __n, __to);
+				      return __n;
+				    });
+	return __ws;
+      }
+  }
+#pragma GCC diagnostic pop
+
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(int __val)
-  { return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf, 4 * sizeof(int),
-					    L"%d", __val); }
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
 
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(unsigned __val)
-  { return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf,
-					    4 * sizeof(unsigned),
-					    L"%u", __val); }
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
 
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(long __val)
-  { return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf, 4 * sizeof(long),
-					    L"%ld", __val); }
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
 
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(unsigned long __val)
-  { return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf,
-					    4 * sizeof(unsigned long),
-					    L"%lu", __val); }
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
 
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(long long __val)
-  { return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf,
-					    4 * sizeof(long long),
-					    L"%lld", __val); }
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
 
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(unsigned long long __val)
-  { return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf,
-					    4 * sizeof(unsigned long long),
-					    L"%llu", __val); }
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
 
+#if __glibcxx_to_string || _GLIBCXX_USE_C99_STDIO
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(float __val)
-  {
-    const int __n =
-      __gnu_cxx::__numeric_traits<float>::__max_exponent10 + 20;
-    return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf, __n,
-					    L"%f", __val);
-  }
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
 
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(double __val)
-  {
-    const int __n =
-      __gnu_cxx::__numeric_traits<double>::__max_exponent10 + 20;
-    return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf, __n,
-					    L"%f", __val);
-  }
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
 
   _GLIBCXX_NODISCARD
   inline wstring
   to_wstring(long double __val)
-  {
-    const int __n =
-      __gnu_cxx::__numeric_traits<long double>::__max_exponent10 + 20;
-    return __gnu_cxx::__to_xstring<wstring>(&std::vswprintf, __n,
-					    L"%Lf", __val);
-  }
-#endif // _GLIBCXX_HAVE_BROKEN_VSWPRINTF
-#endif // _GLIBCXX_USE_WCHAR_T && _GLIBCXX_USE_C99_WCHAR
+  { return std::__to_wstring_numeric(std::to_string(__val)); }
+#endif
+#endif // _GLIBCXX_USE_WCHAR_T
 
 _GLIBCXX_END_NAMESPACE_CXX11
 _GLIBCXX_END_NAMESPACE_VERSION
@@ -4491,10 +4755,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     { };
 #endif
 
-#if __cplusplus >= 201402L
-
-#define __cpp_lib_string_udls 201304L
-
+#ifdef __glibcxx_string_udls // C++ >= 14
   inline namespace literals
   {
   inline namespace string_literals
@@ -4502,7 +4763,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wliteral-suffix"
 
-#if __cpp_lib_constexpr_string >= 201907L
+#if __glibcxx_constexpr_string >= 201907L
 # define _GLIBCXX_STRING_CONSTEXPR constexpr
 #else
 # define _GLIBCXX_STRING_CONSTEXPR
@@ -4539,6 +4800,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #pragma GCC diagnostic pop
   } // inline namespace string_literals
   } // inline namespace literals
+#endif // __glibcxx_string_udls
 
 #if __cplusplus >= 201703L
   namespace __detail::__variant
@@ -4556,7 +4818,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { };
   }  // namespace __detail::__variant
 #endif // C++17
-#endif // C++14
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std

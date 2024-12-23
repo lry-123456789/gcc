@@ -1,5 +1,5 @@
 /* Definitions for GCC.  Part of the machine description for CRIS.
-   Copyright (C) 1998-2023 Free Software Foundation, Inc.
+   Copyright (C) 1998-2024 Free Software Foundation, Inc.
    Contributed by Axis Communications.
 
 This file is part of GCC.
@@ -20,8 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Prototypes for the CRIS port.  */
 
-#include "tree.h" /* For ERROR_MARK.  */
-
 extern bool cris_simple_epilogue (void);
 #ifdef RTX_CODE
 extern const char *cris_op_str (rtx);
@@ -30,14 +28,14 @@ extern bool cris_reload_address_legitimized (rtx, machine_mode, int, int, int);
 extern int cris_side_effect_mode_ok (enum rtx_code, rtx *, int, int,
                                      int, int, int);
 extern rtx cris_return_addr_rtx (int, rtx);
+extern rtx cris_eh_return_handler_rtx ();
 extern rtx cris_split_movdx (rtx *);
 extern bool cris_base_p (const_rtx, bool);
 extern bool cris_base_or_autoincr_p (const_rtx, bool);
 extern bool cris_bdap_index_p (const_rtx, bool);
 extern void cris_reduce_compare (rtx *, rtx *, rtx *);
 extern bool cris_biap_index_p (const_rtx, bool);
-extern bool cris_legitimate_address_p (machine_mode, rtx, bool,
-				       code_helper = ERROR_MARK);
+extern bool cris_legitimate_address_p (machine_mode, rtx, bool);
 extern bool cris_store_multiple_op_p (rtx);
 extern bool cris_movem_load_rest_p (rtx);
 extern void cris_asm_output_symbol_ref (FILE *, rtx);

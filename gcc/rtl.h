@@ -1,5 +1,5 @@
 /* Register Transfer Language (RTL) definitions for GCC
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -45,7 +45,7 @@ class predefined_function_abi;
 /* Register Transfer Language EXPRESSIONS CODES */
 
 #define RTX_CODE	enum rtx_code
-enum rtx_code  {
+enum rtx_code : unsigned {
 
 #define DEF_RTL_EXPR(ENUM, NAME, FORMAT, CLASS)   ENUM ,
 #include "rtl.def"		/* rtl expressions are documented here */
@@ -204,7 +204,8 @@ union rtunion
 {
   int rt_int;
   unsigned int rt_uint;
-  poly_uint16_pod rt_subreg;
+  location_t rt_loc;
+  poly_uint16 rt_subreg;
   const char *rt_str;
   rtx rt_rtx;
   rtvec rt_rtvec;
@@ -584,7 +585,7 @@ struct GTY(()) rtx_debug_insn : public rtx_insn
      i.e. an annotation for tracking variable assignments.
 
      This is an instance of:
-       DEF_RTL_EXPR(DEBUG_INSN, "debug_insn", "uuBeiie", RTX_INSN)
+       DEF_RTL_EXPR(DEBUG_INSN, "debug_insn", "uuBeLie", RTX_INSN)
      from rtl.def.  */
 };
 
@@ -595,7 +596,7 @@ struct GTY(()) rtx_nonjump_insn : public rtx_insn
      i.e an instruction that cannot jump.
 
      This is an instance of:
-       DEF_RTL_EXPR(INSN, "insn", "uuBeiie", RTX_INSN)
+       DEF_RTL_EXPR(INSN, "insn", "uuBeLie", RTX_INSN)
      from rtl.def.  */
 };
 
@@ -607,7 +608,7 @@ public:
      i.e. an instruction that can possibly jump.
 
      This is an instance of:
-       DEF_RTL_EXPR(JUMP_INSN, "jump_insn", "uuBeiie0", RTX_INSN)
+       DEF_RTL_EXPR(JUMP_INSN, "jump_insn", "uuBeLie0", RTX_INSN)
      from rtl.def.  */
 
   /* Returns jump target of this instruction.  The returned value is not
@@ -635,7 +636,7 @@ struct GTY(()) rtx_call_insn : public rtx_insn
      in the current function.
 
      This is an instance of:
-       DEF_RTL_EXPR(CALL_INSN, "call_insn", "uuBeiiee", RTX_INSN)
+       DEF_RTL_EXPR(CALL_INSN, "call_insn", "uuBeLiee", RTX_INSN)
      from rtl.def.  */
 };
 
@@ -1347,6 +1348,7 @@ extern void rtl_check_failed_flag (const char *, const_rtx, const char *,
 
 #define XINT(RTX, N)	(RTL_CHECK2 (RTX, N, 'i', 'n').rt_int)
 #define XUINT(RTX, N)   (RTL_CHECK2 (RTX, N, 'i', 'n').rt_uint)
+#define XLOC(RTX, N)    (RTL_CHECK1 (RTX, N, 'L').rt_loc)
 #define XSTR(RTX, N)	(RTL_CHECK2 (RTX, N, 's', 'S').rt_str)
 #define XEXP(RTX, N)	(RTL_CHECK2 (RTX, N, 'e', 'u').rt_rtx)
 #define XVEC(RTX, N)	(RTL_CHECK2 (RTX, N, 'E', 'V').rt_rtvec)
@@ -1364,6 +1366,7 @@ extern void rtl_check_failed_flag (const char *, const_rtx, const char *,
 
 #define X0INT(RTX, N)	   (RTL_CHECK1 (RTX, N, '0').rt_int)
 #define X0UINT(RTX, N)	   (RTL_CHECK1 (RTX, N, '0').rt_uint)
+#define X0LOC(RTX, N)	   (RTL_CHECK1 (RTX, N, '0').rt_loc)
 #define X0STR(RTX, N)	   (RTL_CHECK1 (RTX, N, '0').rt_str)
 #define X0EXP(RTX, N)	   (RTL_CHECK1 (RTX, N, '0').rt_rtx)
 #define X0VEC(RTX, N)	   (RTL_CHECK1 (RTX, N, '0').rt_rtvec)
@@ -1380,6 +1383,7 @@ extern void rtl_check_failed_flag (const char *, const_rtx, const char *,
 
 #define XCINT(RTX, N, C)      (RTL_CHECKC1 (RTX, N, C).rt_int)
 #define XCUINT(RTX, N, C)     (RTL_CHECKC1 (RTX, N, C).rt_uint)
+#define XCLOC(RTX, N, C)      (RTL_CHECKC1 (RTX, N, C).rt_loc)
 #define XCSUBREG(RTX, N, C)   (RTL_CHECKC1 (RTX, N, C).rt_subreg)
 #define XCSTR(RTX, N, C)      (RTL_CHECKC1 (RTX, N, C).rt_str)
 #define XCEXP(RTX, N, C)      (RTL_CHECKC1 (RTX, N, C).rt_rtx)
@@ -1511,14 +1515,14 @@ inline rtx& PATTERN (rtx insn)
   return XEXP (insn, 3);
 }
 
-inline unsigned int INSN_LOCATION (const rtx_insn *insn)
+inline location_t INSN_LOCATION (const rtx_insn *insn)
 {
-  return XUINT (insn, 4);
+  return XLOC (insn, 4);
 }
 
-inline unsigned int& INSN_LOCATION (rtx_insn *insn)
+inline location_t& INSN_LOCATION (rtx_insn *insn)
 {
-  return XUINT (insn, 4);
+  return XLOC (insn, 4);
 }
 
 inline bool INSN_HAS_LOCATION (const rtx_insn *insn)
@@ -1676,7 +1680,7 @@ extern const char * const reg_note_name[];
 #define NOTE_EH_HANDLER(INSN)	XCINT (INSN, 3, NOTE)
 #define NOTE_BASIC_BLOCK(INSN)	XCBBDEF (INSN, 3, NOTE)
 #define NOTE_VAR_LOCATION(INSN)	XCEXP (INSN, 3, NOTE)
-#define NOTE_MARKER_LOCATION(INSN) XCUINT (INSN, 3, NOTE)
+#define NOTE_MARKER_LOCATION(INSN) XCLOC (INSN, 3, NOTE)
 #define NOTE_CFI(INSN)		XCCFI (INSN, 3, NOTE)
 #define NOTE_LABEL_NUMBER(INSN)	XCINT (INSN, 3, NOTE)
 
@@ -2225,11 +2229,21 @@ struct address_info {
        reloading.
 
      - *BASE is a variable expression representing a base address.
-       It contains exactly one REG, SUBREG or MEM, pointed to by BASE_TERM.
+       It contains exactly one "term", pointed to by BASE_TERM.
+       This term can be one of the following:
+
+       (1) a REG, or a SUBREG of a REG
+       (2) an eliminated REG (a PLUS of (1) and a constant)
+       (3) a MEM, or a SUBREG of a MEM
+       (4) a SCRATCH
+
+       This term is the one that base_reg_class constrains.
 
      - *INDEX is a variable expression representing an index value.
        It may be a scaled expression, such as a MULT.  It has exactly
-       one REG, SUBREG or MEM, pointed to by INDEX_TERM.
+       one "term", pointed to by INDEX_TERM.  The possible terms are
+       the same as for BASE.  This term is the one that index_reg_class
+       constrains.
 
      - *DISP is a constant, possibly mutated.  DISP_TERM points to the
        unmutated RTX_CONST_OBJ.  */
@@ -2270,6 +2284,7 @@ namespace wi
     /* This ought to be true, except for the special case that BImode
        is canonicalized to STORE_FLAG_VALUE, which might be 1.  */
     static const bool is_sign_extended = false;
+    static const bool needs_write_val_arg = false;
     static unsigned int get_precision (const rtx_mode_t &);
     static wi::storage_ref decompose (HOST_WIDE_INT *, unsigned int,
 				      const rtx_mode_t &);
@@ -2402,7 +2417,7 @@ rtx_to_poly_int64 (const_rtx x)
    otherwise leave it unmodified.  */
 
 inline bool
-poly_int_rtx_p (const_rtx x, poly_int64_pod *res)
+poly_int_rtx_p (const_rtx x, poly_int64 *res)
 {
   if (CONST_INT_P (x))
     {
@@ -2599,8 +2614,8 @@ do {								        \
 #define ASM_OPERANDS_LABEL_VEC(RTX) XCVEC (RTX, 5, ASM_OPERANDS)
 #define ASM_OPERANDS_LABEL_LENGTH(RTX) XCVECLEN (RTX, 5, ASM_OPERANDS)
 #define ASM_OPERANDS_LABEL(RTX, N) XCVECEXP (RTX, 5, N, ASM_OPERANDS)
-#define ASM_OPERANDS_SOURCE_LOCATION(RTX) XCUINT (RTX, 6, ASM_OPERANDS)
-#define ASM_INPUT_SOURCE_LOCATION(RTX) XCUINT (RTX, 1, ASM_INPUT)
+#define ASM_OPERANDS_SOURCE_LOCATION(RTX) XCLOC (RTX, 6, ASM_OPERANDS)
+#define ASM_INPUT_SOURCE_LOCATION(RTX) XCLOC (RTX, 1, ASM_INPUT)
 
 /* 1 if RTX is a mem that is statically allocated in read-only memory.  */
 #define MEM_READONLY_P(RTX) \
@@ -3347,6 +3362,8 @@ extern rtx_note *emit_note_after (enum insn_note, rtx_insn *);
 extern rtx_insn *emit_insn (rtx);
 extern rtx_insn *emit_debug_insn (rtx);
 extern rtx_insn *emit_jump_insn (rtx);
+extern rtx_insn *emit_likely_jump_insn (rtx);
+extern rtx_insn *emit_unlikely_jump_insn (rtx);
 extern rtx_insn *emit_call_insn (rtx);
 extern rtx_code_label *emit_label (rtx);
 extern rtx_jump_table_data *emit_jump_table_data (rtx);
@@ -3628,7 +3645,7 @@ extern HOST_WIDE_INT get_integer_term (const_rtx);
 extern rtx get_related_value (const_rtx);
 extern bool offset_within_block_p (const_rtx, HOST_WIDE_INT);
 extern void split_const (rtx, rtx *, rtx *);
-extern rtx strip_offset (rtx, poly_int64_pod *);
+extern rtx strip_offset (rtx, poly_int64 *);
 extern poly_int64 get_args_size (const_rtx);
 extern bool unsigned_reg_p (rtx);
 extern bool reg_mentioned_p (const_rtx, const_rtx);
@@ -3970,9 +3987,9 @@ get_mem_attrs (const_rtx x)
 #include "genrtl.h"
 #undef gen_rtx_ASM_INPUT
 #define gen_rtx_ASM_INPUT(MODE, ARG0)				\
-  gen_rtx_fmt_si (ASM_INPUT, (MODE), (ARG0), 0)
+  gen_rtx_fmt_sL (ASM_INPUT, (MODE), (ARG0), 0)
 #define gen_rtx_ASM_INPUT_loc(MODE, ARG0, LOC)			\
-  gen_rtx_fmt_si (ASM_INPUT, (MODE), (ARG0), (LOC))
+  gen_rtx_fmt_sL (ASM_INPUT, (MODE), (ARG0), (LOC))
 #endif
 
 /* There are some RTL codes that require special attention; the
@@ -3983,7 +4000,7 @@ extern rtx_expr_list *gen_rtx_EXPR_LIST (machine_mode, rtx, rtx);
 extern rtx_insn_list *gen_rtx_INSN_LIST (machine_mode, rtx, rtx);
 extern rtx_insn *
 gen_rtx_INSN (machine_mode mode, rtx_insn *prev_insn, rtx_insn *next_insn,
-	      basic_block bb, rtx pattern, int location, int code,
+	      basic_block bb, rtx pattern, location_t location, int code,
 	      rtx reg_notes);
 extern rtx gen_rtx_CONST_INT (machine_mode, HOST_WIDE_INT);
 extern rtx gen_rtx_CONST_VECTOR (machine_mode, rtvec);
@@ -4106,8 +4123,11 @@ extern int epilogue_completed;
 
 extern int reload_in_progress;
 
-/* Set to 1 while in lra.  */
-extern int lra_in_progress;
+/* Set to true while in IRA.  */
+extern bool ira_in_progress;
+
+/* Set to true while in LRA.  */
+extern bool lra_in_progress;
 
 /* This macro indicates whether you may create a new
    pseudo-register.  */
@@ -4581,7 +4601,7 @@ load_extend_op (machine_mode mode)
    and return the base.  Return X otherwise.  */
 
 inline rtx
-strip_offset_and_add (rtx x, poly_int64_pod *offset)
+strip_offset_and_add (rtx x, poly_int64 *offset)
 {
   if (GET_CODE (x) == PLUS)
     {
@@ -4606,7 +4626,7 @@ word_register_operation_p (const_rtx x)
     case SIGN_EXTRACT:
     case ZERO_EXTRACT:
       return false;
-    
+
     default:
       return true;
     }
